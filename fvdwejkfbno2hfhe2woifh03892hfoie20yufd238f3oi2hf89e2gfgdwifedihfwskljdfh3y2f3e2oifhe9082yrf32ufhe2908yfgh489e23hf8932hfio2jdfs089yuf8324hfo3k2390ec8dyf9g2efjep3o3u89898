@@ -469,7 +469,38 @@ function library:CreateLoader(title, gameInfo)
         end
     end)
     
-    -- Watermark in corner
+    -- Create Watermark
+    local Watermark = createInstance("Frame", {
+        Name = "Watermark",
+        Parent = DeadcellLoader,
+        BackgroundColor3 = DARK_BACKGROUND,
+        BorderSizePixel = 0,
+        Position = UDim2.new(1, -110, 0, 10),
+        Size = UDim2.new(0, 100, 0, 25),
+        AnchorPoint = Vector2.new(0, 0)
+    })
+    
+    local WatermarkCorner = createInstance("UICorner", {
+        CornerRadius = UDim.new(0, 3),
+        Parent = Watermark
+    })
+    
+    local WatermarkBorder = createInstance("UIStroke", {
+        Parent = Watermark,
+        Color = ACCENT_COLOR,
+        Thickness = 1
+    })
+    
+    local WatermarkText = createInstance("TextLabel", {
+        Name = "WatermarkText",
+        Parent = Watermark,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        Font = Enum.Font.Code,
+        Text = "oracle.net",
+        TextColor3 = TEXT_COLOR,
+        TextSize = 13
+    })
     
     -- Entrance animation
     MainFrame.Position = UDim2.new(0.5, -175, 0.5, -300)
@@ -559,7 +590,6 @@ loader:SetLoadCallback(function()
 
 end)
 -- End of Selection
-
 
 
 
