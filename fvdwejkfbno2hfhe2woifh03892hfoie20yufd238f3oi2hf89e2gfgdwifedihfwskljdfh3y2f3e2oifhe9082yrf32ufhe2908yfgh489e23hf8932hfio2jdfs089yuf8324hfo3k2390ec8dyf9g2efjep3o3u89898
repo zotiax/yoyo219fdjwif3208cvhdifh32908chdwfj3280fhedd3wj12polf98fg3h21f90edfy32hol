@@ -1,4 +1,5 @@
 
+
 local library = {}
 
 -- Services
@@ -16,13 +17,13 @@ local Camera = workspace.CurrentCamera
 
 -- Constants
 local TWEEN_SPEED = 0.25
-local ACCENT_COLOR = Color3.fromRGB(61, 100, 227)
-local BACKGROUND_COLOR = Color3.fromRGB(20, 20, 26)
-local DARK_BACKGROUND = Color3.fromRGB(16, 16, 22)
-local SECTION_BACKGROUND = Color3.fromRGB(24, 24, 30)
-local BORDER_COLOR = Color3.fromRGB(45, 45, 52)
+local ACCENT_COLOR = Color3.fromRGB(100, 80, 240) -- Slightly different accent color
+local BACKGROUND_COLOR = Color3.fromRGB(18, 18, 24)
+local DARK_BACKGROUND = Color3.fromRGB(14, 14, 20)
+local SECTION_BACKGROUND = Color3.fromRGB(22, 22, 28)
+local BORDER_COLOR = Color3.fromRGB(40, 40, 50)
 local TEXT_COLOR = Color3.fromRGB(245, 245, 245)
-local OBJECT_BACKGROUND = Color3.fromRGB(35, 35, 45)
+local OBJECT_BACKGROUND = Color3.fromRGB(32, 32, 42)
 local RISKY_TEXT_COLOR = Color3.fromRGB(245, 239, 120)
 local SUBTITLE_COLOR = Color3.fromRGB(180, 180, 180)
 
@@ -60,18 +61,26 @@ function library:CreateLoader(title, gameInfo)
         ResetOnSpawn = false
     })
     
+    -- Blur effect (mild)
+    local BlurEffect = createInstance("BlurEffect", {
+        Name = "LoaderBlur",
+        Parent = Camera,
+        Size = 0
+    })
+    createTween(BlurEffect, {Size = 5}, 0.5):Play()
+    
     local MainFrame = createInstance("Frame", {
         Name = "MainFrame",
         Parent = DeadcellLoader,
         BackgroundColor3 = DARK_BACKGROUND,
         BorderSizePixel = 0,
-        Position = UDim2.new(0.5, -175, 0.5, -125),
-        Size = UDim2.new(0, 350, 0, 250),
+        Position = UDim2.new(0.5, -225, 0.5, -175),
+        Size = UDim2.new(0, 450, 0, 350),
         AnchorPoint = Vector2.new(0.5, 0.5)
     })
     
     local UICorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = MainFrame
     })
     
@@ -86,7 +95,7 @@ function library:CreateLoader(title, gameInfo)
     })
     
     local OuterCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 4),
+        CornerRadius = UDim.new(0, 7), -- Slightly increased corner radius
         Parent = OuterBorder
     })
     
@@ -96,11 +105,11 @@ function library:CreateLoader(title, gameInfo)
         Parent = MainFrame,
         BackgroundColor3 = DARK_BACKGROUND,
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 25)
+        Size = UDim2.new(1, 0, 0, 38) -- Slightly increased height
     })
     
     local TitleCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6),
         Parent = TitleBar
     })
     
@@ -118,8 +127,8 @@ function library:CreateLoader(title, gameInfo)
         Parent = TitleBar,
         BackgroundColor3 = ACCENT_COLOR,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 8, 0.5, -1),
-        Size = UDim2.new(0, 3, 0, 14),
+        Position = UDim2.new(0, 12, 0.5, -1),
+        Size = UDim2.new(0, 4, 0, 20),
         AnchorPoint = Vector2.new(0, 0.5)
     })
     
@@ -127,12 +136,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "TitleText",
         Parent = TitleBar,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 18, 0, 0),
-        Size = UDim2.new(1, -18, 1, 0),
-        Font = Enum.Font.Code,
-        Text = title or "deadcell.xyz",
+        Position = UDim2.new(0, 24, 0, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        Font = Enum.Font.Gotham, -- Changed font
+        Text = title or "oracle.net",
         TextColor3 = TEXT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -141,12 +150,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "VersionLabel",
         Parent = TitleBar,
         BackgroundTransparency = 1,
-        Position = UDim2.new(1, -45, 0, 0),
-        Size = UDim2.new(0, 40, 1, 0),
-        Font = Enum.Font.Code,
-        Text = "v1.3.0",
+        Position = UDim2.new(1, -55, 0, 0),
+        Size = UDim2.new(0, 50, 1, 0),
+        Font = Enum.Font.Gotham, -- Changed font
+        Text = "v1.4.0", -- Updated version
         TextColor3 = ACCENT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Right
     })
     
@@ -156,8 +165,8 @@ function library:CreateLoader(title, gameInfo)
         Parent = MainFrame,
         BackgroundColor3 = BACKGROUND_COLOR,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 8, 0, 33),
-        Size = UDim2.new(1, -16, 1, -41)
+        Position = UDim2.new(0, 10, 0, 48), -- Adjusted position
+        Size = UDim2.new(1, -20, 1, -58) -- Adjusted size
     })
     
     -- Game Info Section
@@ -167,11 +176,11 @@ function library:CreateLoader(title, gameInfo)
         BackgroundColor3 = SECTION_BACKGROUND,
         BorderSizePixel = 0,
         Position = UDim2.new(0, 0, 0, 0),
-        Size = UDim2.new(1, 0, 0, 80)
+        Size = UDim2.new(1, 0, 0, 110)
     })
     
     local GameInfoCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = GameInfoSection
     })
     
@@ -185,12 +194,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "GameInfoHeader",
         Parent = GameInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8, 0, 4),
-        Size = UDim2.new(1, -16, 0, 16),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 12, 0, 6),
+        Size = UDim2.new(1, -24, 0, 20),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "game information",
         TextColor3 = ACCENT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -198,13 +207,13 @@ function library:CreateLoader(title, gameInfo)
         Name = "GameIcon",
         Parent = GameInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8, 0, 25),
-        Size = UDim2.new(0, 50, 0, 50),
+        Position = UDim2.new(0, 12, 0, 32),
+        Size = UDim2.new(0, 70, 0, 70),
         Image = "rbxassetid://" .. (gameInfo.IconId or "6031280882")
     })
     
     local GameIconCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = GameIcon
     })
     
@@ -218,12 +227,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "GameNameLabel",
         Parent = GameInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 65, 0, 25),
-        Size = UDim2.new(1, -75, 0, 18),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 90, 0, 32),
+        Size = UDim2.new(1, -100, 0, 24),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = gameInfo.Name or game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
         TextColor3 = TEXT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -231,12 +240,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "GameIdLabel",
         Parent = GameInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 65, 0, 43),
-        Size = UDim2.new(1, -75, 0, 16),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 90, 0, 56),
+        Size = UDim2.new(1, -100, 0, 22),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "id: " .. (gameInfo.Id or game.PlaceId),
         TextColor3 = SUBTITLE_COLOR,
-        TextSize = 13,
+        TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -244,12 +253,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "GamePlayersLabel",
         Parent = GameInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 65, 0, 59),
-        Size = UDim2.new(1, -75, 0, 16),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 90, 0, 78),
+        Size = UDim2.new(1, -100, 0, 22),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "players: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers,
         TextColor3 = SUBTITLE_COLOR,
-        TextSize = 13,
+        TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -259,12 +268,12 @@ function library:CreateLoader(title, gameInfo)
         Parent = ContentFrame,
         BackgroundColor3 = SECTION_BACKGROUND,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 0, 0, 85),
-        Size = UDim2.new(1, 0, 0, 70)
+        Position = UDim2.new(0, 0, 0, 120),
+        Size = UDim2.new(1, 0, 0, 100)
     })
     
     local UserInfoCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = UserInfoSection
     })
     
@@ -278,12 +287,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "UserInfoHeader",
         Parent = UserInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8, 0, 4),
-        Size = UDim2.new(1, -16, 0, 16),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 12, 0, 6),
+        Size = UDim2.new(1, -24, 0, 20),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "user information",
         TextColor3 = ACCENT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -291,13 +300,13 @@ function library:CreateLoader(title, gameInfo)
         Name = "UserIcon",
         Parent = UserInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8, 0, 25),
-        Size = UDim2.new(0, 40, 0, 40),
+        Position = UDim2.new(0, 12, 0, 32),
+        Size = UDim2.new(0, 60, 0, 60),
         Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
     })
     
     local UserIconCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = UserIcon
     })
     
@@ -311,12 +320,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "UserNameLabel",
         Parent = UserInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 55, 0, 25),
-        Size = UDim2.new(1, -65, 0, 18),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 80, 0, 32),
+        Size = UDim2.new(1, -90, 0, 24),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = LocalPlayer.Name,
         TextColor3 = TEXT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -324,12 +333,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "UserIdLabel",
         Parent = UserInfoSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 55, 0, 43),
-        Size = UDim2.new(1, -65, 0, 18),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 80, 0, 56),
+        Size = UDim2.new(1, -90, 0, 24),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "id: " .. LocalPlayer.UserId,
         TextColor3 = SUBTITLE_COLOR,
-        TextSize = 13,
+        TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -339,12 +348,12 @@ function library:CreateLoader(title, gameInfo)
         Parent = ContentFrame,
         BackgroundColor3 = SECTION_BACKGROUND,
         BorderSizePixel = 0,
-        Position = UDim2.new(0, 0, 0, 160),
-        Size = UDim2.new(0, 210, 0, 25)
+        Position = UDim2.new(0, 0, 0, 230),
+        Size = UDim2.new(0, 270, 0, 38) -- Slightly increased height
     })
     
     local StatusCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = StatusSection
     })
     
@@ -358,12 +367,12 @@ function library:CreateLoader(title, gameInfo)
         Name = "StatusLabel",
         Parent = StatusSection,
         BackgroundTransparency = 1,
-        Position = UDim2.new(0, 8, 0, 0),
-        Size = UDim2.new(1, -16, 1, 0),
-        Font = Enum.Font.Code,
+        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -24, 1, 0),
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "status: ready to inject",
         TextColor3 = RISKY_TEXT_COLOR,
-        TextSize = 13,
+        TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left
     })
     
@@ -373,13 +382,13 @@ function library:CreateLoader(title, gameInfo)
         Parent = ContentFrame,
         BackgroundColor3 = OBJECT_BACKGROUND,
         BorderSizePixel = 0,
-        Position = UDim2.new(1, -120, 0, 160),
-        Size = UDim2.new(0, 120, 0, 25),
+        Position = UDim2.new(1, -160, 0, 230),
+        Size = UDim2.new(0, 160, 0, 38), -- Slightly increased height
         AnchorPoint = Vector2.new(0, 0)
     })
     
     local LoadButtonCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
+        CornerRadius = UDim.new(0, 6), -- Slightly increased corner radius
         Parent = LoadButton
     })
     
@@ -394,10 +403,10 @@ function library:CreateLoader(title, gameInfo)
         Parent = LoadButton,
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
-        Font = Enum.Font.Code,
+        Font = Enum.Font.Gotham, -- Changed font
         Text = "load",
         TextColor3 = TEXT_COLOR,
-        TextSize = 13
+        TextSize = 16
     })
     
     -- Button Hover Effect
@@ -414,18 +423,40 @@ function library:CreateLoader(title, gameInfo)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             createTween(LoadButton, {BackgroundColor3 = ACCENT_COLOR:Lerp(Color3.new(0, 0, 0), 0.5)}):Play()
             
-
             StatusLabel.Text = "status: injecting..."
             LoadButtonText.Text = "injecting..."
+            
+            -- Create simple loading bar
+            local LoadingFrame = createInstance("Frame", {
+                Name = "LoadingFrame",
+                Parent = ContentFrame,
+                BackgroundColor3 = SECTION_BACKGROUND,
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 0, 0, 278),
+                Size = UDim2.new(1, 0, 0, 4),
+                BackgroundTransparency = 0.2
+            })
+            
+            local LoadingBar = createInstance("Frame", {
+                Name = "LoadingBar",
+                Parent = LoadingFrame,
+                BackgroundColor3 = ACCENT_COLOR,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 0, 1, 0)
+            })
             
             task.spawn(function()
                 local steps = {"checking game", "bypassing anticheat", "loading modules", "initializing hooks", "complete"}
                 for i, step in ipairs(steps) do
+                    createTween(LoadingBar, {Size = UDim2.new(i/#steps, 0, 1, 0)}, 0.5):Play()
                     task.wait(0.5)
                     StatusLabel.Text = "status: " .. step
                 end
                 
                 task.wait(0.5)
+                createTween(BlurEffect, {Size = 0}, 0.5):Play()
+                task.wait(0.5)
+                BlurEffect:Destroy()
                 DeadcellLoader:Destroy()
                 
                 -- Execute the loadstring
@@ -469,41 +500,8 @@ function library:CreateLoader(title, gameInfo)
         end
     end)
     
-    -- Create Watermark
-    local Watermark = createInstance("Frame", {
-        Name = "Watermark",
-        Parent = DeadcellLoader,
-        BackgroundColor3 = DARK_BACKGROUND,
-        BorderSizePixel = 0,
-        Position = UDim2.new(1, -110, 0, 10),
-        Size = UDim2.new(0, 100, 0, 25),
-        AnchorPoint = Vector2.new(0, 0)
-    })
-    
-    local WatermarkCorner = createInstance("UICorner", {
-        CornerRadius = UDim.new(0, 3),
-        Parent = Watermark
-    })
-    
-    local WatermarkBorder = createInstance("UIStroke", {
-        Parent = Watermark,
-        Color = ACCENT_COLOR,
-        Thickness = 1
-    })
-    
-    local WatermarkText = createInstance("TextLabel", {
-        Name = "WatermarkText",
-        Parent = Watermark,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 1, 0),
-        Font = Enum.Font.Code,
-        Text = "oracle.net",
-        TextColor3 = TEXT_COLOR,
-        TextSize = 13
-    })
-    
     -- Entrance animation
-    MainFrame.Position = UDim2.new(0.5, -175, 0.5, -300)
+    MainFrame.Position = UDim2.new(0.5, -225, 0.5, -400)
     MainFrame.BackgroundTransparency = 1
     OuterBorder.BackgroundTransparency = 1
     
@@ -522,13 +520,9 @@ function library:CreateLoader(title, gameInfo)
         end
     end
     
-    Watermark.BackgroundTransparency = 1
-    WatermarkBorder.Transparency = 1
-    WatermarkText.TextTransparency = 1
-    
 
     task.delay(0.1, function()
-        createTween(MainFrame, {Position = UDim2.new(0.5, -175, 0.5, -125), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Quint):Play()
+        createTween(MainFrame, {Position = UDim2.new(0.5, -225, 0.5, -175), BackgroundTransparency = 0}, 0.5, Enum.EasingStyle.Quint):Play()
         createTween(OuterBorder, {BackgroundTransparency = 0}, 0.5):Play()
         
         task.delay(0.2, function()
@@ -546,10 +540,6 @@ function library:CreateLoader(title, gameInfo)
                     createTween(obj, {Transparency = 0}, 0.5):Play()
                 end
             end
-            
-            createTween(Watermark, {BackgroundTransparency = 0}, 0.5):Play()
-            createTween(WatermarkBorder, {Transparency = 0}, 0.5):Play()
-            createTween(WatermarkText, {TextTransparency = 0}, 0.5):Play()
         end)
     end)
     
@@ -590,8 +580,6 @@ loader:SetLoadCallback(function()
 
 end)
 -- End of Selection
-
-
 
 
 
