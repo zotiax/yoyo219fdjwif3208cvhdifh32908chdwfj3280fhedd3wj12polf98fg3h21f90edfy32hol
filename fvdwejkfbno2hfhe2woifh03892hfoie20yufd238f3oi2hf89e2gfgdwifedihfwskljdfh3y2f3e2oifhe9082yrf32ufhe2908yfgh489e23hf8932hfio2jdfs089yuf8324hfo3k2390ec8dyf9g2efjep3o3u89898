@@ -4995,7 +4995,7 @@ do -- Legit Aim Assist
     local ShowFOV = false
     local StickyAimActive = false
     local CurrentTarget = nil
-    local LockedTarget = nil
+    local LockedTarget = nil -- This will store the locked target for sticky aim
     local LastAimTime = 0
     
     -- FOV Circles
@@ -5033,7 +5033,6 @@ do -- Legit Aim Assist
         
         -- Advanced Features
         StickyAim = false,
-        StickyAimStrength = 30,
         ShakeReduction = 0,
         AimAcceleration = false,
         AccelerationSpeed = 15,
@@ -5251,6 +5250,25 @@ do -- Legit Aim Assist
         return bestTarget
     end
     
+    local function IsLockedTargetValid()
+        if not LockedTarget then return false end
+        if not LockedTarget.Parent then return false end
+        
+        local character = LockedTarget.Parent
+        local player = Players:GetPlayerFromCharacter(character)
+        
+        if not player then return false end
+        if not IsPlayerValid(player) then return false end
+        
+        -- Check if target is still alive
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if Settings.AliveCheck and (not humanoid or humanoid.Health <= 0) then
+            return false
+        end
+        
+        return true
+    end
+    
     local function ApplySmoothing(currentPos, targetPos, deltaTime)
         local smoothness = Settings.Smoothness
         
@@ -5344,30 +5362,6 @@ do -- Legit Aim Assist
         LastAimTime = tick()
     end
     
-    local function ApplyStickyAim(targetPart)
-        if not Settings.StickyAim or not StickyAimActive then return end
-        if not targetPart then return end
-        
-        local mousePos = UserInputService:GetMouseLocation()
-        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-        
-        if not onScreen then return end
-        
-        local stickyStrength = Settings.StickyAimStrength / 100
-        local pullDistance = math.sqrt(
-            (screenPos.X - mousePos.X)^2 + 
-            (screenPos.Y - mousePos.Y)^2
-        )
-        
-        if pullDistance < Settings.FOVSize then
-            local pullFactor = (1 - (pullDistance / Settings.FOVSize)) * stickyStrength
-            mousemoverel(
-                (screenPos.X - mousePos.X) * pullFactor * 0.1,
-                (screenPos.Y - mousePos.Y) * pullFactor * 0.1
-            )
-        end
-    end
-    
     -- FOV Circle Creation
     local function CreateFOVCircles()
         -- Outline (behind)
@@ -5431,12 +5425,25 @@ do -- Legit Aim Assist
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
             StickyAimActive = true
+            
+            -- Lock onto target when sticky aim is activated
+            if Settings.StickyAim and AimAssistEnabled and not LockedTarget then
+                local target = GetBestTarget()
+                if target then
+                    LockedTarget = target
+                end
+            end
         end
     end)
     
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
             StickyAimActive = false
+            
+            -- Unlock target when sticky aim is deactivated
+            if Settings.StickyAim then
+                LockedTarget = nil
+            end
         end
     end)
     
@@ -5454,11 +5461,19 @@ do -- Legit Aim Assist
             return
         end
         
-        CurrentTarget = GetBestTarget()
+        -- Sticky Aim Logic: Use locked target if valid, otherwise get new target
+        if Settings.StickyAim and LockedTarget and IsLockedTargetValid() then
+            CurrentTarget = LockedTarget
+        else
+            -- If sticky aim is on but locked target is invalid, clear it
+            if Settings.StickyAim and LockedTarget then
+                LockedTarget = nil
+            end
+            CurrentTarget = GetBestTarget()
+        end
         
         if CurrentTarget then
             AimAt(CurrentTarget, deltaTime)
-            ApplyStickyAim(CurrentTarget)
         end
     end)
     
@@ -5472,7 +5487,7 @@ do -- Legit Aim Assist
         AimAssistActive = Value
     end})
     
-    AimAssistSection:Slider({Name = "Smoothness", Min = 0, Max = 25, Default = 8, Decimals = 0.1, Flag = "LegitAim_Smoothness", Callback = function(Value)
+    AimAssistSection:Slider({Name = "Smoothness", Min = 0, Max = 150, Default = 8, Decimals = 0.1, Flag = "LegitAim_Smoothness", Callback = function(Value)
         Settings.Smoothness = Value
     end})
     
@@ -5550,12 +5565,12 @@ do -- Legit Aim Assist
     
     local AdvancedSection = LegitTab:Section({Name = "Advanced", Side = 2})
     
-    AdvancedSection:Toggle({Name = "Sticky Aim", Flag = "LegitAim_Sticky", Default = false, Callback = function(Value)
+    AdvancedSection:Toggle({Name = "Sticky Aim (Lock Target)", Flag = "LegitAim_Sticky", Default = false, Callback = function(Value)
         Settings.StickyAim = Value
-    end})
-    
-    AdvancedSection:Slider({Name = "Sticky Strength", Min = 0, Max = 100, Default = 30, Suffix = "%", Decimals = 0.1, Flag = "LegitAim_StickyStrength", Callback = function(Value)
-        Settings.StickyAimStrength = Value
+        -- Clear locked target when toggling off
+        if not Value then
+            LockedTarget = nil
+        end
     end})
     
     AdvancedSection:Slider({Name = "Shake Reduction", Min = 0, Max = 100, Default = 0, Suffix = "%", Decimals = 0.1, Flag = "LegitAim_Shake", Callback = function(Value)
