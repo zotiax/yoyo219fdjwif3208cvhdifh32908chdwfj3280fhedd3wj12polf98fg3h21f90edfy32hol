@@ -5472,7 +5472,7 @@ do -- Legit Aim Assist
         AimAssistActive = Value
     end})
     
-    AimAssistSection:Slider({Name = "Smoothness", Min = 1, Max = 25, Default = 8, Decimals = 0.1, Flag = "LegitAim_Smoothness", Callback = function(Value)
+    AimAssistSection:Slider({Name = "Smoothness", Min = 0, Max = 25, Default = 8, Decimals = 0.1, Flag = "LegitAim_Smoothness", Callback = function(Value)
         Settings.Smoothness = Value
     end})
     
