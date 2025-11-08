@@ -198,7 +198,7 @@ local Library do
             ["Page Background"] = FromRGB(10, 10, 10),
             ["Border"] = FromRGB(10, 10, 10),
             ["Outline"] = FromRGB(10, 10, 10),
-            ["Accent"] = FromRGB(255,255,255),
+            ["Accent"] = FromRGB(100, 82, 155),
             ["Element"] = FromRGB(10, 10, 10),
             ["Hovered Element"] = FromRGB(40, 40, 43),
             ["Text"] = FromRGB(215, 215, 215),
@@ -4897,15 +4897,15 @@ local Library do
 end
 --
 local Window = Library:Window({
-    Name = "MEOW.GG - Hood Customs | Ver. 0.7.5 | Build - Private ",
+    Name = "MEOW.GG - Hood Customs | Ver. 1.0 | Build - Public ",
     Size = UDim2.new(0, 350, 0, 350),
     FadeSpeed = 0.25
 })
 
-local Watermark = Library:Watermark("MEOW.GG | Build - Private | Uid - ? ")
+local Watermark = Library:Watermark("MEOW.GG | Build - Public | Uid - 33 ")
 local KeybindList = Library:KeybindList()
 
-Watermark:SetVisibility(false)
+Watermark:SetVisibility(true)
 KeybindList:SetVisibility(false)
 
 
@@ -4958,7 +4958,12 @@ KeybindList:SetVisibility(false)
 
 local RageTab = Window:Page({Name = "Rage", Columns = 2, Subtabs = false})
 
--- Void System Configuration
+
+
+
+
+
+-- MEOW.GG - Void System + Silent Aim Integration
 local voidmeow = {
 	enabled = false,
 	spam_enabled = false,
@@ -4966,53 +4971,75 @@ local voidmeow = {
 	client_root = nil,
 	saved_cframe = nil,
 	current_void_pos = Vector3.new(0, 0, 0),
-
-	-- Spam settings
 	is_in_void = false,
 	timer = 0,
 	void_time = 0.15,
 	normal_time = 0.05,
-
-	-- Teleport settings
 	teleport_speed = 3,
 	void_height_min = -500,
 	void_height_max = -300,
 	void_range = 5000,
-
-	-- Visual settings
 	show_indicator = true,
 	void_text_color = Color3.fromRGB(255, 50, 50),
 	spam_text_color = Color3.fromRGB(255, 165, 0),
 	ground_text_color = Color3.fromRGB(50, 255, 150),
+	selected_mode = "Off"
+}
 
-	-- Force Hit settings
-	force_hit_enabled = false,
-	force_hit_active = false,
-	force_hit_autofire = false,
-	force_hit_delay = 0.1,
-	force_hit_wall_check = true,
-	force_hit_forcefield_check = true,
-	force_hit_last_shot = 0
+-- Silent Aim System
+local silentaim = {
+	enabled = false,
+	target_player = nil,
+	fov = 350,
+	show_fov = true,
+	show_fov_fill = true,
+	show_tracer = true,
+	fov_color = Color3.fromRGB(0, 255, 0),
+	fov_fill_color = Color3.fromRGB(0, 255, 0),
+	fov_fill_transparency = 0.9,
+	fov_thickness = 2,
+	tracer_color = Color3.fromRGB(255, 0, 0),
+	tracer_thickness = 2,
+	hitpart = "Head",
+	use_closest_part = false,
+	mouse_hook = nil,
+	-- Auto Shoot
+	auto_shoot = false,
+	auto_shoot_delay = 0.1,
+	last_shot_time = 0,
+	-- Checks
+	checks = {
+		wall_check = true,
+		forcefield_check = true,
+		knocked_check = true,
+		dead_check = true,
+		team_check = false,
+		visible_check = true
+	}
 }
 
 -- Services
 local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
+local uis = game:GetService("UserInputService")
 local lp = players.LocalPlayer
 local camera = workspace.CurrentCamera
+local mouse = lp:GetMouse()
 
--- Drawing API Elements
+-- Silent Aim Visuals
+local fov_circle = nil
+local fov_fill = nil
+local fov_outline = nil
+local tracer_line = nil
+local tracer_outline = nil
+
+-- Void Drawings
 local voidDrawings = {}
-local targetDrawings = {}
-local forceHitDrawings = {}
-
--- Create void drawings function
 local function createVoidDrawings()
 	voidDrawings.menuBg = Drawing.new("Square")
 	voidDrawings.menuBg.Size = Vector2.new(320, 140)
 	voidDrawings.menuBg.Color = Color3.fromRGB(18, 18, 18)
 	voidDrawings.menuBg.Filled = true
-	voidDrawings.menuBg.Visible = false
 	voidDrawings.menuBg.Transparency = 0.95
 	voidDrawings.menuBg.ZIndex = 1
 
@@ -5020,7 +5047,6 @@ local function createVoidDrawings()
 	voidDrawings.menuBgSecondary.Size = Vector2.new(320, 140)
 	voidDrawings.menuBgSecondary.Color = Color3.fromRGB(25, 25, 25)
 	voidDrawings.menuBgSecondary.Filled = true
-	voidDrawings.menuBgSecondary.Visible = false
 	voidDrawings.menuBgSecondary.Transparency = 0.8
 	voidDrawings.menuBgSecondary.ZIndex = 1
 
@@ -5028,7 +5054,6 @@ local function createVoidDrawings()
 	voidDrawings.menuOutline.Size = Vector2.new(320, 140)
 	voidDrawings.menuOutline.Color = Color3.fromRGB(255, 255, 255)
 	voidDrawings.menuOutline.Filled = false
-	voidDrawings.menuOutline.Visible = false
 	voidDrawings.menuOutline.Transparency = 0.3
 	voidDrawings.menuOutline.Thickness = 1
 	voidDrawings.menuOutline.ZIndex = 2
@@ -5037,7 +5062,6 @@ local function createVoidDrawings()
 	voidDrawings.menuGlow.Size = Vector2.new(316, 136)
 	voidDrawings.menuGlow.Color = Color3.fromRGB(255, 255, 255)
 	voidDrawings.menuGlow.Filled = false
-	voidDrawings.menuGlow.Visible = false
 	voidDrawings.menuGlow.Transparency = 0.15
 	voidDrawings.menuGlow.Thickness = 1
 	voidDrawings.menuGlow.ZIndex = 2
@@ -5049,13 +5073,11 @@ local function createVoidDrawings()
 	voidDrawings.brandText.Center = false
 	voidDrawings.brandText.Outline = true
 	voidDrawings.brandText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.brandText.Visible = false
 	voidDrawings.brandText.ZIndex = 3
 
 	voidDrawings.brandLine = Drawing.new("Line")
 	voidDrawings.brandLine.Color = Color3.fromRGB(255, 255, 255)
 	voidDrawings.brandLine.Thickness = 2
-	voidDrawings.brandLine.Visible = false
 	voidDrawings.brandLine.Transparency = 0.8
 	voidDrawings.brandLine.ZIndex = 3
 
@@ -5063,7 +5085,6 @@ local function createVoidDrawings()
 	voidDrawings.statusDot.Radius = 6
 	voidDrawings.statusDot.Color = Color3.fromRGB(255, 50, 50)
 	voidDrawings.statusDot.Filled = true
-	voidDrawings.statusDot.Visible = false
 	voidDrawings.statusDot.Transparency = 1
 	voidDrawings.statusDot.NumSides = 32
 	voidDrawings.statusDot.ZIndex = 4
@@ -5072,7 +5093,6 @@ local function createVoidDrawings()
 	voidDrawings.statusDotGlow.Radius = 9
 	voidDrawings.statusDotGlow.Color = Color3.fromRGB(255, 50, 50)
 	voidDrawings.statusDotGlow.Filled = true
-	voidDrawings.statusDotGlow.Visible = false
 	voidDrawings.statusDotGlow.Transparency = 0.3
 	voidDrawings.statusDotGlow.NumSides = 32
 	voidDrawings.statusDotGlow.ZIndex = 3
@@ -5080,7 +5100,6 @@ local function createVoidDrawings()
 	voidDrawings.dividerLine = Drawing.new("Line")
 	voidDrawings.dividerLine.Color = Color3.fromRGB(60, 60, 60)
 	voidDrawings.dividerLine.Thickness = 1
-	voidDrawings.dividerLine.Visible = false
 	voidDrawings.dividerLine.Transparency = 0.6
 	voidDrawings.dividerLine.ZIndex = 3
 
@@ -5091,7 +5110,6 @@ local function createVoidDrawings()
 	voidDrawings.positionLabel.Center = false
 	voidDrawings.positionLabel.Outline = true
 	voidDrawings.positionLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.positionLabel.Visible = false
 	voidDrawings.positionLabel.ZIndex = 3
 
 	voidDrawings.positionText = Drawing.new("Text")
@@ -5101,7 +5119,6 @@ local function createVoidDrawings()
 	voidDrawings.positionText.Center = false
 	voidDrawings.positionText.Outline = true
 	voidDrawings.positionText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.positionText.Visible = false
 	voidDrawings.positionText.ZIndex = 3
 
 	voidDrawings.modeLabel = Drawing.new("Text")
@@ -5111,7 +5128,6 @@ local function createVoidDrawings()
 	voidDrawings.modeLabel.Center = false
 	voidDrawings.modeLabel.Outline = true
 	voidDrawings.modeLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.modeLabel.Visible = false
 	voidDrawings.modeLabel.ZIndex = 3
 
 	voidDrawings.modeText = Drawing.new("Text")
@@ -5121,7 +5137,6 @@ local function createVoidDrawings()
 	voidDrawings.modeText.Center = false
 	voidDrawings.modeText.Outline = true
 	voidDrawings.modeText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.modeText.Visible = false
 	voidDrawings.modeText.ZIndex = 3
 
 	voidDrawings.distanceLabel = Drawing.new("Text")
@@ -5131,7 +5146,6 @@ local function createVoidDrawings()
 	voidDrawings.distanceLabel.Center = false
 	voidDrawings.distanceLabel.Outline = true
 	voidDrawings.distanceLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.distanceLabel.Visible = false
 	voidDrawings.distanceLabel.ZIndex = 3
 
 	voidDrawings.distanceText = Drawing.new("Text")
@@ -5141,14 +5155,12 @@ local function createVoidDrawings()
 	voidDrawings.distanceText.Center = false
 	voidDrawings.distanceText.Outline = true
 	voidDrawings.distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	voidDrawings.distanceText.Visible = false
 	voidDrawings.distanceText.ZIndex = 3
 
 	voidDrawings.positionGlow = Drawing.new("Circle")
 	voidDrawings.positionGlow.Radius = 14
 	voidDrawings.positionGlow.Color = Color3.fromRGB(255, 255, 255)
 	voidDrawings.positionGlow.Filled = true
-	voidDrawings.positionGlow.Visible = false
 	voidDrawings.positionGlow.Transparency = 0.2
 	voidDrawings.positionGlow.NumSides = 32
 	voidDrawings.positionGlow.ZIndex = 8
@@ -5157,7 +5169,6 @@ local function createVoidDrawings()
 	voidDrawings.positionDotOutline.Radius = 9
 	voidDrawings.positionDotOutline.Color = Color3.fromRGB(40, 40, 40)
 	voidDrawings.positionDotOutline.Filled = true
-	voidDrawings.positionDotOutline.Visible = false
 	voidDrawings.positionDotOutline.Transparency = 1
 	voidDrawings.positionDotOutline.NumSides = 32
 	voidDrawings.positionDotOutline.ZIndex = 9
@@ -5166,226 +5177,388 @@ local function createVoidDrawings()
 	voidDrawings.positionDot.Radius = 7
 	voidDrawings.positionDot.Color = Color3.fromRGB(255, 255, 255)
 	voidDrawings.positionDot.Filled = true
-	voidDrawings.positionDot.Visible = false
 	voidDrawings.positionDot.Transparency = 1
 	voidDrawings.positionDot.NumSides = 32
 	voidDrawings.positionDot.ZIndex = 10
 end
 
--- Create target drawings function
-local function createTargetDrawings()
-	targetDrawings.menuBg = Drawing.new("Square")
-	targetDrawings.menuBg.Size = Vector2.new(280, 120)
-	targetDrawings.menuBg.Color = Color3.fromRGB(18, 18, 18)
-	targetDrawings.menuBg.Filled = true
-	targetDrawings.menuBg.Visible = false
-	targetDrawings.menuBg.Transparency = 0.95
-	targetDrawings.menuBg.ZIndex = 1
-
-	targetDrawings.menuBgSecondary = Drawing.new("Square")
-	targetDrawings.menuBgSecondary.Size = Vector2.new(280, 120)
-	targetDrawings.menuBgSecondary.Color = Color3.fromRGB(25, 25, 25)
-	targetDrawings.menuBgSecondary.Filled = true
-	targetDrawings.menuBgSecondary.Visible = false
-	targetDrawings.menuBgSecondary.Transparency = 0.8
-	targetDrawings.menuBgSecondary.ZIndex = 1
-
-	targetDrawings.menuOutline = Drawing.new("Square")
-	targetDrawings.menuOutline.Size = Vector2.new(280, 120)
-	targetDrawings.menuOutline.Color = Color3.fromRGB(255, 255, 255)
-	targetDrawings.menuOutline.Filled = false
-	targetDrawings.menuOutline.Visible = false
-	targetDrawings.menuOutline.Transparency = 0.3
-	targetDrawings.menuOutline.Thickness = 1
-	targetDrawings.menuOutline.ZIndex = 2
-
-	targetDrawings.menuGlow = Drawing.new("Square")
-	targetDrawings.menuGlow.Size = Vector2.new(276, 116)
-	targetDrawings.menuGlow.Color = Color3.fromRGB(255, 255, 255)
-	targetDrawings.menuGlow.Filled = false
-	targetDrawings.menuGlow.Visible = false
-	targetDrawings.menuGlow.Transparency = 0.15
-	targetDrawings.menuGlow.Thickness = 1
-	targetDrawings.menuGlow.ZIndex = 2
-
-	targetDrawings.targetLockedText = Drawing.new("Text")
-	targetDrawings.targetLockedText.Text = "TARGET LOCKED"
-	targetDrawings.targetLockedText.Size = 16
-	targetDrawings.targetLockedText.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.targetLockedText.Center = false
-	targetDrawings.targetLockedText.Outline = true
-	targetDrawings.targetLockedText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.targetLockedText.Visible = false
-	targetDrawings.targetLockedText.ZIndex = 3
-
-	targetDrawings.lockDot = Drawing.new("Circle")
-	targetDrawings.lockDot.Radius = 6
-	targetDrawings.lockDot.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.lockDot.Filled = true
-	targetDrawings.lockDot.Visible = false
-	targetDrawings.lockDot.Transparency = 1
-	targetDrawings.lockDot.NumSides = 32
-	targetDrawings.lockDot.ZIndex = 4
-
-	targetDrawings.lockDotGlow = Drawing.new("Circle")
-	targetDrawings.lockDotGlow.Radius = 9
-	targetDrawings.lockDotGlow.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.lockDotGlow.Filled = true
-	targetDrawings.lockDotGlow.Visible = false
-	targetDrawings.lockDotGlow.Transparency = 0.3
-	targetDrawings.lockDotGlow.NumSides = 32
-	targetDrawings.lockDotGlow.ZIndex = 3
-
-	targetDrawings.dividerLine = Drawing.new("Line")
-	targetDrawings.dividerLine.Color = Color3.fromRGB(60, 60, 60)
-	targetDrawings.dividerLine.Thickness = 1
-	targetDrawings.dividerLine.Visible = false
-	targetDrawings.dividerLine.Transparency = 0.6
-	targetDrawings.dividerLine.ZIndex = 3
-
-	targetDrawings.nameLabel = Drawing.new("Text")
-	targetDrawings.nameLabel.Text = "NAME"
-	targetDrawings.nameLabel.Size = 11
-	targetDrawings.nameLabel.Color = Color3.fromRGB(120, 120, 120)
-	targetDrawings.nameLabel.Center = false
-	targetDrawings.nameLabel.Outline = true
-	targetDrawings.nameLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.nameLabel.Visible = false
-	targetDrawings.nameLabel.ZIndex = 3
-
-	targetDrawings.nameText = Drawing.new("Text")
-	targetDrawings.nameText.Text = "None"
-	targetDrawings.nameText.Size = 13
-	targetDrawings.nameText.Color = Color3.fromRGB(220, 220, 220)
-	targetDrawings.nameText.Center = false
-	targetDrawings.nameText.Outline = true
-	targetDrawings.nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.nameText.Visible = false
-	targetDrawings.nameText.ZIndex = 3
-
-	targetDrawings.healthLabel = Drawing.new("Text")
-	targetDrawings.healthLabel.Text = "HEALTH"
-	targetDrawings.healthLabel.Size = 11
-	targetDrawings.healthLabel.Color = Color3.fromRGB(120, 120, 120)
-	targetDrawings.healthLabel.Center = false
-	targetDrawings.healthLabel.Outline = true
-	targetDrawings.healthLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.healthLabel.Visible = false
-	targetDrawings.healthLabel.ZIndex = 3
-
-	targetDrawings.healthText = Drawing.new("Text")
-	targetDrawings.healthText.Text = "100"
-	targetDrawings.healthText.Size = 13
-	targetDrawings.healthText.Color = Color3.fromRGB(50, 255, 150)
-	targetDrawings.healthText.Center = false
-	targetDrawings.healthText.Outline = true
-	targetDrawings.healthText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.healthText.Visible = false
-	targetDrawings.healthText.ZIndex = 3
-
-	targetDrawings.distanceLabel = Drawing.new("Text")
-	targetDrawings.distanceLabel.Text = "DIST"
-	targetDrawings.distanceLabel.Size = 11
-	targetDrawings.distanceLabel.Color = Color3.fromRGB(120, 120, 120)
-	targetDrawings.distanceLabel.Center = false
-	targetDrawings.distanceLabel.Outline = true
-	targetDrawings.distanceLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.distanceLabel.Visible = false
-	targetDrawings.distanceLabel.ZIndex = 3
-
-	targetDrawings.distanceText = Drawing.new("Text")
-	targetDrawings.distanceText.Text = "0 studs"
-	targetDrawings.distanceText.Size = 13
-	targetDrawings.distanceText.Color = Color3.fromRGB(220, 220, 220)
-	targetDrawings.distanceText.Center = false
-	targetDrawings.distanceText.Outline = true
-	targetDrawings.distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
-	targetDrawings.distanceText.Visible = false
-	targetDrawings.distanceText.ZIndex = 3
-
-	targetDrawings.targetIndicatorOuter = Drawing.new("Circle")
-	targetDrawings.targetIndicatorOuter.Radius = 25
-	targetDrawings.targetIndicatorOuter.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.targetIndicatorOuter.Filled = false
-	targetDrawings.targetIndicatorOuter.Visible = false
-	targetDrawings.targetIndicatorOuter.Transparency = 0.8
-	targetDrawings.targetIndicatorOuter.Thickness = 2
-	targetDrawings.targetIndicatorOuter.NumSides = 32
-	targetDrawings.targetIndicatorOuter.ZIndex = 11
-
-	targetDrawings.targetIndicatorInner = Drawing.new("Circle")
-	targetDrawings.targetIndicatorInner.Radius = 15
-	targetDrawings.targetIndicatorInner.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.targetIndicatorInner.Filled = false
-	targetDrawings.targetIndicatorInner.Visible = false
-	targetDrawings.targetIndicatorInner.Transparency = 1
-	targetDrawings.targetIndicatorInner.Thickness = 2
-	targetDrawings.targetIndicatorInner.NumSides = 32
-	targetDrawings.targetIndicatorInner.ZIndex = 12
-
-	targetDrawings.targetIndicatorCenter = Drawing.new("Circle")
-	targetDrawings.targetIndicatorCenter.Radius = 4
-	targetDrawings.targetIndicatorCenter.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.targetIndicatorCenter.Filled = true
-	targetDrawings.targetIndicatorCenter.Visible = false
-	targetDrawings.targetIndicatorCenter.Transparency = 1
-	targetDrawings.targetIndicatorCenter.NumSides = 32
-	targetDrawings.targetIndicatorCenter.ZIndex = 13
-
-	targetDrawings.crosshairLineTop = Drawing.new("Line")
-	targetDrawings.crosshairLineTop.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.crosshairLineTop.Thickness = 2
-	targetDrawings.crosshairLineTop.Visible = false
-	targetDrawings.crosshairLineTop.Transparency = 1
-	targetDrawings.crosshairLineTop.ZIndex = 12
-
-	targetDrawings.crosshairLineBottom = Drawing.new("Line")
-	targetDrawings.crosshairLineBottom.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.crosshairLineBottom.Thickness = 2
-	targetDrawings.crosshairLineBottom.Visible = false
-	targetDrawings.crosshairLineBottom.Transparency = 1
-	targetDrawings.crosshairLineBottom.ZIndex = 12
-
-	targetDrawings.crosshairLineLeft = Drawing.new("Line")
-	targetDrawings.crosshairLineLeft.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.crosshairLineLeft.Thickness = 2
-	targetDrawings.crosshairLineLeft.Visible = false
-	targetDrawings.crosshairLineLeft.Transparency = 1
-	targetDrawings.crosshairLineLeft.ZIndex = 12
-
-	targetDrawings.crosshairLineRight = Drawing.new("Line")
-	targetDrawings.crosshairLineRight.Color = Color3.fromRGB(255, 50, 50)
-	targetDrawings.crosshairLineRight.Thickness = 2
-	targetDrawings.crosshairLineRight.Visible = false
-	targetDrawings.crosshairLineRight.Transparency = 1
-	targetDrawings.crosshairLineRight.ZIndex = 12
-end
-
--- Create SIMPLE force hit drawings (DOT + RING ONLY)
-local function createForceHitDrawings()
-	forceHitDrawings.targetDot = Drawing.new("Circle")
-	forceHitDrawings.targetDot.Radius = 5
-	forceHitDrawings.targetDot.Color = Color3.fromRGB(255, 50, 50)
-	forceHitDrawings.targetDot.Filled = true
-	forceHitDrawings.targetDot.Visible = false
-	forceHitDrawings.targetDot.Transparency = 1
-	forceHitDrawings.targetDot.ZIndex = 100
-
-	forceHitDrawings.targetRing = Drawing.new("Circle")
-	forceHitDrawings.targetRing.Radius = 18
-	forceHitDrawings.targetRing.Color = Color3.fromRGB(255, 50, 50)
-	forceHitDrawings.targetRing.Filled = false
-	forceHitDrawings.targetRing.Visible = false
-	forceHitDrawings.targetRing.Transparency = 0.7
-	forceHitDrawings.targetRing.Thickness = 2
-	forceHitDrawings.targetRing.ZIndex = 99
-end
-
 createVoidDrawings()
-createTargetDrawings()
-createForceHitDrawings()
 
--- Update void menu position
+-- Silent Aim Functions
+local function createFOVCircle()
+	if fov_circle then return end
+	
+	-- Fill circle
+	fov_fill = Drawing.new("Circle")
+	fov_fill.Radius = silentaim.fov
+	fov_fill.Color = silentaim.fov_fill_color
+	fov_fill.Thickness = 1
+	fov_fill.NumSides = 64
+	fov_fill.Filled = true
+	fov_fill.Transparency = silentaim.fov_fill_transparency
+	fov_fill.ZIndex = 997
+	
+	-- Outline
+	fov_outline = Drawing.new("Circle")
+	fov_outline.Radius = silentaim.fov
+	fov_outline.Color = Color3.fromRGB(0, 0, 0)
+	fov_outline.Thickness = silentaim.fov_thickness + 1
+	fov_outline.NumSides = 64
+	fov_outline.Filled = false
+	fov_outline.Transparency = 1
+	fov_outline.ZIndex = 998
+	
+	-- Main circle
+	fov_circle = Drawing.new("Circle")
+	fov_circle.Radius = silentaim.fov
+	fov_circle.Color = silentaim.fov_color
+	fov_circle.Thickness = silentaim.fov_thickness
+	fov_circle.NumSides = 64
+	fov_circle.Filled = false
+	fov_circle.Transparency = 1
+	fov_circle.ZIndex = 999
+end
+
+local function removeFOVCircle()
+	if fov_circle then
+		fov_circle:Remove()
+		fov_circle = nil
+	end
+	if fov_fill then
+		fov_fill:Remove()
+		fov_fill = nil
+	end
+	if fov_outline then
+		fov_outline:Remove()
+		fov_outline = nil
+	end
+end
+
+local function createTracer()
+	if tracer_line then return end
+	
+	-- Outline
+	tracer_outline = Drawing.new("Line")
+	tracer_outline.Color = Color3.fromRGB(0, 0, 0)
+	tracer_outline.Thickness = silentaim.tracer_thickness + 2
+	tracer_outline.Transparency = 1
+	tracer_outline.ZIndex = 996
+	
+	-- Main line
+	tracer_line = Drawing.new("Line")
+	tracer_line.Color = silentaim.tracer_color
+	tracer_line.Thickness = silentaim.tracer_thickness
+	tracer_line.Transparency = 1
+	tracer_line.ZIndex = 997
+end
+
+local function removeTracer()
+	if tracer_line then
+		tracer_line:Remove()
+		tracer_line = nil
+	end
+	if tracer_outline then
+		tracer_outline:Remove()
+		tracer_outline = nil
+	end
+end
+
+-- Fixed: Get all valid parts for a character
+local function getAllValidParts(character)
+	local validParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso"}
+	local parts = {}
+	
+	for _, partName in ipairs(validParts) do
+		local part = character:FindFirstChild(partName)
+		if part then
+			table.insert(parts, part)
+		end
+	end
+	
+	return parts
+end
+
+-- Check if player is valid target
+local function isValidTarget(player)
+	if not player or player == lp then return false end
+	
+	local character = player.Character
+	if not character then return false end
+	
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return false end
+	
+	-- Dead check
+	if silentaim.checks.dead_check and humanoid.Health <= 0 then
+		return false
+	end
+	
+	-- Knocked check (common in games like Da Hood)
+	if silentaim.checks.knocked_check then
+		-- Check for knocked state (various methods)
+		local bodyEffects = character:FindFirstChild("BodyEffects")
+		if bodyEffects then
+			local ko = bodyEffects:FindFirstChild("K.O")
+			if ko and ko.Value == true then
+				return false
+			end
+		end
+		
+		-- Alternative knocked check
+		if humanoid:FindFirstChild("creator") then
+			return false
+		end
+		
+		-- Check PlatformStand (knocked down state)
+		if humanoid.PlatformStand then
+			return false
+		end
+	end
+	
+	-- Forcefield check
+	if silentaim.checks.forcefield_check then
+		if character:FindFirstChildOfClass("ForceField") then
+			return false
+		end
+	end
+	
+	-- Team check
+	if silentaim.checks.team_check then
+		if player.Team == lp.Team and player.Team ~= nil then
+			return false
+		end
+	end
+	
+	return true
+end
+
+-- Wall check function
+local function isVisible(targetPart)
+	if not silentaim.checks.wall_check then return true end
+	if not targetPart then return false end
+	
+	local character = lp.Character
+	if not character then return false end
+	
+	local origin = camera.CFrame.Position
+	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
+	
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	raycastParams.FilterDescendantsInstances = {character, targetPart.Parent}
+	raycastParams.IgnoreWater = true
+	
+	local result = workspace:Raycast(origin, direction, raycastParams)
+	
+	return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+-- Check if target is visible on screen
+local function isOnScreen(part)
+	if not silentaim.checks.visible_check then return true end
+	if not part then return false end
+	
+	local _, onScreen = camera:WorldToViewportPoint(part.Position)
+	return onScreen
+end
+
+-- Fixed: Get closest player in FOV
+local function getClosestPlayerInFOV()
+	local closest_player = nil
+	local closest_distance = math.huge
+	local mouse_pos = uis:GetMouseLocation()
+	
+	for _, player in ipairs(players:GetPlayers()) do
+		if isValidTarget(player) then
+			local char = player.Character
+			local parts = getAllValidParts(char)
+			
+			for _, part in ipairs(parts) do
+				if isOnScreen(part) and isVisible(part) then
+					local screen_pos, on_screen = camera:WorldToViewportPoint(part.Position)
+					
+					if on_screen then
+						local distance = (Vector2.new(screen_pos.X, screen_pos.Y) - mouse_pos).Magnitude
+						
+						if distance < silentaim.fov and distance < closest_distance then
+							closest_distance = distance
+							closest_player = player
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	return closest_player
+end
+
+-- Fixed: Get the best part to aim at
+local function getAimPart(character)
+	if not character then return nil end
+	
+	-- If use_closest_part is enabled, find the part closest to mouse
+	if silentaim.use_closest_part then
+		local closest_part = nil
+		local closest_distance = math.huge
+		local mouse_pos = uis:GetMouseLocation()
+		local parts = getAllValidParts(character)
+		
+		for _, part in ipairs(parts) do
+			if isOnScreen(part) and isVisible(part) then
+				local screen_pos, on_screen = camera:WorldToViewportPoint(part.Position)
+				if on_screen then
+					local distance = (Vector2.new(screen_pos.X, screen_pos.Y) - mouse_pos).Magnitude
+					if distance < closest_distance then
+						closest_distance = distance
+						closest_part = part
+					end
+				end
+			end
+		end
+		
+		return closest_part
+	else
+		-- Use the selected hitpart
+		local part = character:FindFirstChild(silentaim.hitpart)
+		if part and isVisible(part) then
+			return part
+		end
+		
+		-- Fallback to HumanoidRootPart
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if hrp and isVisible(hrp) then
+			return hrp
+		end
+	end
+	
+	return nil
+end
+
+-- Auto Shoot Function
+local function autoShoot()
+	if not silentaim.auto_shoot or not silentaim.enabled then return end
+	
+	local current_time = tick()
+	if current_time - silentaim.last_shot_time < silentaim.auto_shoot_delay then
+		return
+	end
+	
+	local target = getClosestPlayerInFOV()
+	if not target or not target.Character then return end
+	
+	local target_part = getAimPart(target.Character)
+	if not target_part then return end
+	
+	-- Trigger mouse click
+	silentaim.last_shot_time = current_time
+	mouse1click()
+end
+
+local function updateFOVPosition()
+	if not silentaim.show_fov then
+		if fov_circle then fov_circle.Visible = false end
+		if fov_fill then fov_fill.Visible = false end
+		if fov_outline then fov_outline.Visible = false end
+		return
+	end
+	
+	local mouse_pos = uis:GetMouseLocation()
+	
+	if fov_fill and silentaim.show_fov_fill then
+		fov_fill.Position = mouse_pos
+		fov_fill.Radius = silentaim.fov
+		fov_fill.Visible = true
+	elseif fov_fill then
+		fov_fill.Visible = false
+	end
+	
+	if fov_outline then
+		fov_outline.Position = mouse_pos
+		fov_outline.Radius = silentaim.fov
+		fov_outline.Thickness = silentaim.fov_thickness + 1
+		fov_outline.Visible = true
+	end
+	
+	if fov_circle then
+		fov_circle.Position = mouse_pos
+		fov_circle.Radius = silentaim.fov
+		fov_circle.Thickness = silentaim.fov_thickness
+		fov_circle.Visible = true
+	end
+end
+
+local function updateTracer()
+	if not silentaim.show_tracer then
+		if tracer_line then tracer_line.Visible = false end
+		if tracer_outline then tracer_outline.Visible = false end
+		return
+	end
+	
+	local target = getClosestPlayerInFOV()
+	
+	if not target or not target.Character then
+		if tracer_line then tracer_line.Visible = false end
+		if tracer_outline then tracer_outline.Visible = false end
+		return
+	end
+	
+	local target_part = getAimPart(target.Character)
+	if not target_part then
+		if tracer_line then tracer_line.Visible = false end
+		if tracer_outline then tracer_outline.Visible = false end
+		return
+	end
+	
+	local screen_pos, on_screen = camera:WorldToViewportPoint(target_part.Position)
+	if on_screen then
+		local mouse_pos = uis:GetMouseLocation()
+		local target_pos = Vector2.new(screen_pos.X, screen_pos.Y)
+		
+		if tracer_outline then
+			tracer_outline.From = mouse_pos
+			tracer_outline.To = target_pos
+			tracer_outline.Thickness = silentaim.tracer_thickness + 2
+			tracer_outline.Visible = true
+		end
+		
+		if tracer_line then
+			tracer_line.From = mouse_pos
+			tracer_line.To = target_pos
+			tracer_line.Thickness = silentaim.tracer_thickness
+			tracer_line.Visible = true
+		end
+	else
+		if tracer_line then tracer_line.Visible = false end
+		if tracer_outline then tracer_outline.Visible = false end
+	end
+end
+
+-- Setup Silent Aim Hook
+local function setupSilentAimHook()
+	if silentaim.mouse_hook then return end
+	
+	silentaim.mouse_hook = hookmetamethod(game, "__index", function(self, index)
+		local original = silentaim.mouse_hook(self, index)
+		
+		if silentaim.enabled and self == mouse and index:lower() == "hit" then
+			local target = silentaim.target_player or getClosestPlayerInFOV()
+			
+			if target and target.Character then
+				local target_part = getAimPart(target.Character)
+				if target_part then
+					return CFrame.new(target_part.Position)
+				end
+			end
+		end
+		
+		return original
+	end)
+end
+
+setupSilentAimHook()
+
+-- Update Menu Position
 local function updateVoidMenuPosition()
 	local viewportSize = camera.ViewportSize
 	local menuX = (viewportSize.X / 2) - 160
@@ -5409,29 +5582,7 @@ local function updateVoidMenuPosition()
 	voidDrawings.distanceText.Position = Vector2.new(menuX + 60, menuY + 112)
 end
 
--- Update target menu position
-local function updateTargetMenuPosition()
-	local viewportSize = camera.ViewportSize
-	local menuX = 20
-	local menuY = (viewportSize.Y / 2) - 60
-	targetDrawings.menuBg.Position = Vector2.new(menuX, menuY)
-	targetDrawings.menuBgSecondary.Position = Vector2.new(menuX + 2, menuY + 2)
-	targetDrawings.menuOutline.Position = Vector2.new(menuX, menuY)
-	targetDrawings.menuGlow.Position = Vector2.new(menuX + 2, menuY + 2)
-	targetDrawings.targetLockedText.Position = Vector2.new(menuX + 15, menuY + 15)
-	targetDrawings.lockDotGlow.Position = Vector2.new(menuX + 250, menuY + 23)
-	targetDrawings.lockDot.Position = Vector2.new(menuX + 250, menuY + 23)
-	targetDrawings.dividerLine.From = Vector2.new(menuX + 15, menuY + 40)
-	targetDrawings.dividerLine.To = Vector2.new(menuX + 265, menuY + 40)
-	targetDrawings.nameLabel.Position = Vector2.new(menuX + 15, menuY + 50)
-	targetDrawings.nameText.Position = Vector2.new(menuX + 70, menuY + 50)
-	targetDrawings.healthLabel.Position = Vector2.new(menuX + 15, menuY + 72)
-	targetDrawings.healthText.Position = Vector2.new(menuX + 70, menuY + 72)
-	targetDrawings.distanceLabel.Position = Vector2.new(menuX + 15, menuY + 94)
-	targetDrawings.distanceText.Position = Vector2.new(menuX + 70, menuY + 94)
-end
-
--- Update client root
+-- Update Client Root
 local function updateClientRoot()
 	local character = lp.Character
 	if character then
@@ -5441,25 +5592,18 @@ end
 lp.CharacterAdded:Connect(updateClientRoot)
 updateClientRoot()
 
--- Core void functions
+-- PERMANENT HOOK
 local function enable_void_hook()
-	if not voidmeow.hook then
-		voidmeow.hook = hookmetamethod(game, "__index", function(self, index)
-			if not checkcaller() and (voidmeow.enabled or voidmeow.spam_enabled) and voidmeow.saved_cframe and index == "CFrame" and self == voidmeow.client_root then
-				return voidmeow.saved_cframe
-			end
-			return voidmeow.hook(self, index)
-		end)
-	end
+	if voidmeow.hook then return end
+	voidmeow.hook = hookmetamethod(game, "__index", function(self, index)
+		if not checkcaller() and (voidmeow.enabled or voidmeow.spam_enabled) and voidmeow.saved_cframe and index == "CFrame" and self == voidmeow.client_root then
+			return voidmeow.saved_cframe
+		end
+		return voidmeow.hook(self, index)
+	end)
 end
 
-local function disable_void_hook()
-	if voidmeow.hook then
-		unhookmetamethod(game, "__index", voidmeow.hook)
-		voidmeow.hook = nil
-	end
-end
-
+-- Void Teleport
 local function enhancedVoidTeleport()
 	local basePos = voidmeow.client_root.Position
 	local voidPos = Vector3.new(
@@ -5472,92 +5616,7 @@ local function enhancedVoidTeleport()
 	voidmeow.client_root.CFrame = void_cframe
 end
 
--- Force Hit function
-local function checkWallBetween(from, to)
-	local ray = Ray.new(from, (to - from))
-	local part, position = workspace:FindPartOnRayWithIgnoreList(ray, {lp.Character})
-	if part then
-		local distance = (position - from).Magnitude
-		local targetDistance = (to - from).Magnitude
-		return distance < targetDistance
-	end
-	return false
-end
-
-local function hasForceField(character)
-	return character:FindFirstChildOfClass("ForceField") ~= nil
-end
-
-local function canShootTarget(target)
-	if not target or not target.Character then return false end
-	local targetChar = target.Character
-	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-	if not targetHRP then return false end
-
-	local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then return false end
-
-	if voidmeow.force_hit_forcefield_check and hasForceField(targetChar) then return false end
-	if voidmeow.force_hit_wall_check and voidmeow.client_root and checkWallBetween(voidmeow.client_root.Position, targetHRP.Position) then
-		return false
-	end
-	return true
-end
-
--- FIXED FORCE HIT EXECUTION
-local function executeForceHit()
-	if not voidmeow.force_hit_enabled then return end
-	local shouldFire = voidmeow.force_hit_autofire or voidmeow.force_hit_active
-	if not shouldFire then return end
-
-	local currentTime = tick()
-	if currentTime - voidmeow.force_hit_last_shot < voidmeow.force_hit_delay then return end
-
-	local target = TargetMgr and TargetMgr:get()
-	if not target or not canShootTarget(target) then return end
-
-	local targetChar = target.Character
-	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-	if not targetHRP or not voidmeow.client_root then return end
-
-	local originalCFrame = voidmeow.client_root.CFrame
-	local previousSavedCFrame = voidmeow.saved_cframe
-
-	local behindCFrame = targetHRP.CFrame * CFrame.new(0, 0, -3)
-	voidmeow.saved_cframe = behindCFrame
-	voidmeow.client_root.CFrame = behindCFrame
-	voidmeow.force_hit_last_shot = currentTime
-
-	task.wait()
-	voidmeow.client_root.CFrame = originalCFrame
-	voidmeow.saved_cframe = previousSavedCFrame
-end
-
--- Simple force hit indicator (DOT + RING)
-local function updateForceHitIndicator()
-	local target = TargetMgr and TargetMgr:get()
-	if target and target.Character and voidmeow.force_hit_enabled then
-		local head = target.Character:FindFirstChild("Head")
-		if head then
-			local vector, onScreen = camera:WorldToViewportPoint(head.Position)
-			if onScreen then
-				local screenPos = Vector2.new(vector.X, vector.Y)
-				forceHitDrawings.targetDot.Position = screenPos
-				forceHitDrawings.targetRing.Position = screenPos
-				forceHitDrawings.targetDot.Visible = true
-				forceHitDrawings.targetRing.Visible = true
-
-				local angle = tick() * 3
-				forceHitDrawings.targetRing.Radius = 16 + math.sin(angle) * 3
-				return
-			end
-		end
-	end
-	forceHitDrawings.targetDot.Visible = false
-	forceHitDrawings.targetRing.Visible = false
-end
-
--- Set visibility helpers
+-- Visibility Helper
 local function setVoidMenuVisible(visible)
 	for _, drawing in pairs(voidDrawings) do
 		if drawing ~= voidDrawings.positionDot and drawing ~= voidDrawings.positionDotOutline and drawing ~= voidDrawings.positionGlow then
@@ -5566,13 +5625,7 @@ local function setVoidMenuVisible(visible)
 	end
 end
 
-local function setTargetMenuVisible(visible)
-	for _, drawing in pairs(targetDrawings) do
-		drawing.Visible = visible
-	end
-end
-
--- Update void label
+-- Update Void Label
 local function updateVoidLabel()
 	if voidmeow.enabled then
 		local pos = voidmeow.current_void_pos
@@ -5626,150 +5679,52 @@ local function updateVoidLabel()
 	end
 end
 
--- Health color
-local function getHealthColor(health, maxHealth)
-	local percent = health / maxHealth
-	if percent > 0.6 then return Color3.fromRGB(50, 255, 150)
-	elseif percent > 0.3 then return Color3.fromRGB(255, 200, 50)
-	else return Color3.fromRGB(255, 50, 50) end
-end
-
--- FIXED updateTargetLabel (NO 'pretended')
-local function updateTargetLabel()
-	local target = TargetMgr and TargetMgr:get()
-	if target and target.Character then
-		local char = target.Character
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if hum and hum.Health > 0 and hrp then
-			targetDrawings.nameText.Text = target.Name
-			local health = math.floor(hum.Health)
-			local maxHealth = math.floor(hum.MaxHealth)
-			targetDrawings.healthText.Text = string.format("%d / %d", health, maxHealth)
-			targetDrawings.healthText.Color = getHealthColor(health, maxHealth)
-			if voidmeow.client_root then
-				local distance = (voidmeow.client_root.Position - hrp.Position).Magnitude
-				targetDrawings.distanceText.Text = string.format("%.0f studs", distance)
-			end
-			setTargetMenuVisible(true)
-			updateTargetMenuPosition()
-			return true
-		end
-	end
-	setTargetMenuVisible(false)
-	targetDrawings.targetIndicatorOuter.Visible = false
-	targetDrawings.targetIndicatorInner.Visible = false
-	targetDrawings.targetIndicatorCenter.Visible = false
-	targetDrawings.crosshairLineTop.Visible = false
-	targetDrawings.crosshairLineBottom.Visible = false
-	targetDrawings.crosshairLineLeft.Visible = false
-	targetDrawings.crosshairLineRight.Visible = false  -- FIXED
-	return false
-end
-
--- Update target indicator
-local function updateTargetIndicator()
-	local target = TargetMgr and TargetMgr:get()
-	if target and target.Character then
-		local head = target.Character:FindFirstChild("Head")
-		if head then
-			local vector, onScreen = camera:WorldToViewportPoint(head.Position)
-			if onScreen then
-				local screenPos = Vector2.new(vector.X, vector.Y)
-				local outerRadius = 25 + math.sin(tick() * 3) * 3
-				local innerRadius = 15 + math.sin(tick() * 4) * 2
-
-				targetDrawings.targetIndicatorOuter.Position = screenPos
-				targetDrawings.targetIndicatorOuter.Radius = outerRadius
-				targetDrawings.targetIndicatorOuter.Visible = true
-
-				targetDrawings.targetIndicatorInner.Position = screenPos
-				targetDrawings.targetIndicatorInner.Radius = innerRadius
-				targetDrawings.targetIndicatorInner.Visible = true
-
-				targetDrawings.targetIndicatorCenter.Position = screenPos
-				targetDrawings.targetIndicatorCenter.Visible = true
-
-				local lineLength = 12
-				local lineGap = 20
-				targetDrawings.crosshairLineTop.From = Vector2.new(screenPos.X, screenPos.Y - lineGap)
-				targetDrawings.crosshairLineTop.To = Vector2.new(screenPos.X, screenPos.Y - lineGap - lineLength)
-				targetDrawings.crosshairLineTop.Visible = true
-
-				targetDrawings.crosshairLineBottom.From = Vector2.new(screenPos.X, screenPos.Y + lineGap)
-				targetDrawings.crosshairLineBottom.To = Vector2.new(screenPos.X, screenPos.Y + lineGap + lineLength)
-				targetDrawings.crosshairLineBottom.Visible = true
-
-				targetDrawings.crosshairLineLeft.From = Vector2.new(screenPos.X - lineGap, screenPos.Y)
-				targetDrawings.crosshairLineLeft.To = Vector2.new(screenPos.X - lineGap - lineLength, screenPos.Y)
-				targetDrawings.crosshairLineLeft.Visible = true
-
-				targetDrawings.crosshairLineRight.From = Vector2.new(screenPos.X + lineGap, screenPos.Y)
-				targetDrawings.crosshairLineRight.To = Vector2.new(screenPos.X + lineGap + lineLength, screenPos.Y)
-				targetDrawings.crosshairLineRight.Visible = true
-
-				local pulse = math.abs(math.sin(tick() * 3))
-				targetDrawings.targetIndicatorOuter.Transparency = 0.6 + (pulse * 0.3)
-				local glowPulse = math.abs(math.sin(tick() * 2))
-				targetDrawings.lockDotGlow.Transparency = 0.2 + (glowPulse * 0.3)
-				return
-			end
-		end
-	end
-	targetDrawings.targetIndicatorOuter.Visible = false
-	targetDrawings.targetIndicatorInner.Visible = false
-	targetDrawings.targetIndicatorCenter.Visible = false
-	targetDrawings.crosshairLineTop.Visible = false
-	targetDrawings.crosshairLineBottom.Visible = false
-	targetDrawings.crosshairLineLeft.Visible = false
-	targetDrawings.crosshairLineRight.Visible = false
-end
-
--- Update void position indicator
+-- Update Position Indicator
 local function updateVoidPositionIndicator()
-	if voidmeow.show_indicator then
-		local targetPosition
-		local character = lp.Character
-		if voidmeow.enabled then
-			targetPosition = voidmeow.current_void_pos
-		elseif voidmeow.spam_enabled and voidmeow.is_in_void then
-			targetPosition = voidmeow.current_void_pos
-		elseif voidmeow.spam_enabled and voidmeow.saved_cframe and character then
-			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-			if humanoidRootPart then
-				local rootPos = humanoidRootPart.Position
-				local cameraDistance = (camera.CFrame.Position - rootPos).Magnitude
-				local heightAdjustment = math.clamp(cameraDistance * 0.15, 2, 8)
-				targetPosition = rootPos + Vector3.new(0, heightAdjustment, 0)
-			else
-				targetPosition = voidmeow.saved_cframe.Position + Vector3.new(0, 3, 0)
-			end
-		else
-			voidDrawings.positionDot.Visible = false
-			voidDrawings.positionDotOutline.Visible = false
-			voidDrawings.positionGlow.Visible = false
-			return
-		end
+	if not voidmeow.show_indicator then
+		voidDrawings.positionDot.Visible = false
+		voidDrawings.positionDotOutline.Visible = false
+		voidDrawings.positionGlow.Visible = false
+		return
+	end
 
-		local vector, onScreen = camera:WorldToViewportPoint(targetPosition)
-		if onScreen then
-			local screenPos = Vector2.new(vector.X, vector.Y)
-			voidDrawings.positionGlow.Position = screenPos
-			voidDrawings.positionDotOutline.Position = screenPos
-			voidDrawings.positionDot.Position = screenPos
-			voidDrawings.positionGlow.Visible = true
-			voidDrawings.positionDotOutline.Visible = true
-			voidDrawings.positionDot.Visible = true
-
-			local pulse = math.abs(math.sin(tick() * 3))
-			voidDrawings.positionGlow.Transparency = 0.1 + (pulse * 0.3)
-			local glowPulse = math.abs(math.sin(tick() * 2))
-			voidDrawings.statusDotGlow.Transparency = 0.2 + (glowPulse * 0.3)
+	local targetPosition
+	local character = lp.Character
+	if voidmeow.enabled then
+		targetPosition = voidmeow.current_void_pos
+	elseif voidmeow.spam_enabled and voidmeow.is_in_void then
+		targetPosition = voidmeow.current_void_pos
+	elseif voidmeow.spam_enabled and voidmeow.saved_cframe and character then
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local rootPos = hrp.Position
+			local cameraDistance = (camera.CFrame.Position - rootPos).Magnitude
+			local heightAdjustment = math.clamp(cameraDistance * 0.15, 2, 8)
+			targetPosition = rootPos + Vector3.new(0, heightAdjustment, 0)
 		else
-			voidDrawings.positionDot.Visible = false
-			voidDrawings.positionDotOutline.Visible = false
-			voidDrawings.positionGlow.Visible = false
+			targetPosition = voidmeow.saved_cframe.Position + Vector3.new(0, 3, 0)
 		end
+	else
+		voidDrawings.positionDot.Visible = false
+		voidDrawings.positionDotOutline.Visible = false
+		voidDrawings.positionGlow.Visible = false
+		return
+	end
+
+	local vector, onScreen = camera:WorldToViewportPoint(targetPosition)
+	if onScreen then
+		local screenPos = Vector2.new(vector.X, vector.Y)
+		voidDrawings.positionGlow.Position = screenPos
+		voidDrawings.positionDotOutline.Position = screenPos
+		voidDrawings.positionDot.Position = screenPos
+		voidDrawings.positionGlow.Visible = true
+		voidDrawings.positionDotOutline.Visible = true
+		voidDrawings.positionDot.Visible = true
+
+		local pulse = math.abs(math.sin(tick() * 3))
+		voidDrawings.positionGlow.Transparency = 0.1 + (pulse * 0.3)
+		local glowPulse = math.abs(math.sin(tick() * 2))
+		voidDrawings.statusDotGlow.Transparency = 0.2 + (glowPulse * 0.3)
 	else
 		voidDrawings.positionDot.Visible = false
 		voidDrawings.positionDotOutline.Visible = false
@@ -5777,9 +5732,13 @@ local function updateVoidPositionIndicator()
 	end
 end
 
--- Main loop
+-- === MAIN LOOP ===
 run_service.Heartbeat:Connect(function(delta)
 	if not voidmeow.client_root then return end
+
+	local is_active = voidmeow.enabled or voidmeow.spam_enabled
+	voidmeow.enabled = voidmeow.selected_mode == "Permanent Void" and is_active
+	voidmeow.spam_enabled = voidmeow.selected_mode == "Void Spam" and is_active
 
 	if voidmeow.enabled or voidmeow.spam_enabled then
 		enable_void_hook()
@@ -5802,7 +5761,6 @@ run_service.Heartbeat:Connect(function(delta)
 			end
 			run_service.RenderStepped:Wait()
 			voidmeow.client_root.CFrame = voidmeow.saved_cframe
-
 		elseif voidmeow.enabled then
 			voidmeow.saved_cframe = voidmeow.client_root.CFrame
 			for i = 1, voidmeow.teleport_speed do
@@ -5815,7 +5773,6 @@ run_service.Heartbeat:Connect(function(delta)
 		updateVoidLabel()
 		updateVoidPositionIndicator()
 	else
-		disable_void_hook()
 		voidmeow.saved_cframe = nil
 		voidmeow.is_in_void = false
 		voidmeow.timer = 0
@@ -5824,83 +5781,382 @@ run_service.Heartbeat:Connect(function(delta)
 		voidDrawings.positionDotOutline.Visible = false
 		voidDrawings.positionGlow.Visible = false
 	end
-
-	executeForceHit()
-	updateForceHitIndicator()
-	updateTargetLabel()
-	updateTargetIndicator()
 end)
 
--- UI Elements
+-- Silent Aim Visual Update Loop
+run_service.RenderStepped:Connect(function()
+	if silentaim.enabled then
+		updateFOVPosition()
+		updateTracer()
+		autoShoot()
+	end
+end)
+
+-- === UI ===
 if RageTab then
-	local VoidSection = RageTab:Section({Name = "Void System"})
-	VoidSection:Toggle({Name = "Void", Flag = "Void_Enabled", Default = false, Callback = function(Value)
-		voidmeow.enabled = Value
-		if Value then voidmeow.spam_enabled = false end
-	end})
-	VoidSection:Toggle({Name = "Void Spam", Flag = "Void_Spam", Default = false, Callback = function(Value)
-		voidmeow.spam_enabled = Value
-		if Value then voidmeow.enabled = false end
-	end})
-	VoidSection:Slider({Name = "Teleport Speed", Min = 1, Max = 10, Default = 3, Decimals = 1, Flag = "Void_TeleportSpeed", Callback = function(Value)
-		voidmeow.teleport_speed = math.floor(Value)
-	end})
-	VoidSection:Slider({Name = "Void Height", Min = -1000, Max = -100, Default = -400, Decimals = 1, Flag = "Void_Height", Callback = function(Value)
-		voidmeow.void_height_min = Value
-		voidmeow.void_height_max = Value + 200
-	end})
-	VoidSection:Slider({Name = "Void Range", Min = 50, Max = 10000, Default = 5000, Decimals = 1, Flag = "Void_Range", Callback = function(Value)
-		voidmeow.void_range = Value
-	end})
+	-- === SILENT AIM SECTION ===
+	local SilentAimSection = RageTab:Section({Name = "Silent Aim", Side = 2})
 
+	-- Enable Toggle
+	local function setSilentAimActive(active)
+		silentaim.enabled = active
+		
+		if active then
+			createFOVCircle()
+			createTracer()
+		else
+			removeFOVCircle()
+			removeTracer()
+			silentaim.target_player = nil
+		end
+	end
+
+	SilentAimSection:Toggle({
+		Name = "Enabled",
+		Flag = "SilentAim_Enabled",
+		Default = false,
+		Callback = setSilentAimActive
+	})
+
+	-- FOV Size
+	SilentAimSection:Slider({
+		Name = "FOV Size",
+		Min = 50,
+		Max = 1000,
+		Default = 350,
+		Decimals = 1,
+		Flag = "SilentAim_FOV",
+		Callback = function(v)
+			silentaim.fov = v
+		end
+	})
+
+	-- Hit Part (Single Selection)
+	SilentAimSection:Dropdown({
+		Name = "Hit Part",
+		Flag = "SilentAim_HitPart",
+		Default = "Head",
+		Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+		Callback = function(value)
+			silentaim.hitpart = value
+		end
+	})
+
+	SilentAimSection:Toggle({
+		Name = "Use Closest Part",
+		Flag = "SilentAim_ClosestPart",
+		Default = false,
+		Callback = function(v)
+			silentaim.use_closest_part = v
+		end
+	})
+
+	-- FOV Visuals
+	SilentAimSection:Toggle({
+		Name = "Show FOV Circle",
+		Flag = "SilentAim_ShowFOV",
+		Default = true,
+		Callback = function(v)
+			silentaim.show_fov = v
+		end
+	}):Colorpicker({
+		Name = "Color",
+		Flag = "SilentAim_FOVColor",
+		Default = Color3.fromRGB(100, 82, 88),
+		Callback = function(color)
+			silentaim.fov_color = color
+			if fov_circle then
+				fov_circle.Color = color
+			end
+		end
+	})
+
+	SilentAimSection:Slider({
+		Name = "FOV Thickness",
+		Min = 1,
+		Max = 10,
+		Default = 2,
+		Decimals = 1,
+		Flag = "SilentAim_FOVThickness",
+		Callback = function(v)
+			silentaim.fov_thickness = v
+			if fov_circle then
+				fov_circle.Thickness = v
+			end
+			if fov_outline then
+				fov_outline.Thickness = v + 1
+			end
+		end
+	})
+
+	SilentAimSection:Toggle({
+		Name = "FOV Fill",
+		Flag = "SilentAim_FOVFill",
+		Default = true,
+		Callback = function(v)
+			silentaim.show_fov_fill = v
+		end
+	}):Colorpicker({
+		Name = "Color",
+		Flag = "SilentAim_FOVFillColor",
+		Default = Color3.fromRGB(100, 82, 88),
+		Callback = function(color)
+			silentaim.fov_fill_color = color
+			if fov_fill then
+				fov_fill.Color = color
+			end
+		end
+	})
+
+	SilentAimSection:Slider({
+		Name = "Fill Transparency",
+		Min = 0,
+		Max = 1,
+		Default = 0.9,
+		Decimals = 0.01,
+		Flag = "SilentAim_FillTransparency",
+		Callback = function(v)
+			silentaim.fov_fill_transparency = v
+			if fov_fill then
+				fov_fill.Transparency = v
+			end
+		end
+	})
+
+	-- Tracer Visuals
+	SilentAimSection:Toggle({
+		Name = "Show Tracer",
+		Flag = "SilentAim_ShowTracer",
+		Default = true,
+		Callback = function(v)
+			silentaim.show_tracer = v
+		end
+	}):Colorpicker({
+		Name = "Color",
+		Flag = "SilentAim_TracerColor",
+		Default = Color3.fromRGB(100, 82, 88),
+		Callback = function(color)
+			silentaim.tracer_color = color
+			if tracer_line then
+				tracer_line.Color = color
+			end
+		end
+	})
+
+	SilentAimSection:Slider({
+		Name = "Tracer Thickness",
+		Min = 1,
+		Max = 10,
+		Default = 2,
+		Decimals = 1,
+		Flag = "SilentAim_TracerThickness",
+		Callback = function(v)
+			silentaim.tracer_thickness = v
+			if tracer_line then
+				tracer_line.Thickness = v
+			end
+			if tracer_outline then
+				tracer_outline.Thickness = v + 2
+			end
+		end
+	})
+
+	-- Auto Shoot
+	SilentAimSection:Toggle({
+		Name = "Auto Shoot",
+		Flag = "SilentAim_AutoShoot",
+		Default = false,
+		Callback = function(v)
+			silentaim.auto_shoot = v
+		end
+	})
+
+	SilentAimSection:Slider({
+		Name = "Shoot Delay",
+		Min = 0.01,
+		Max = 1,
+		Default = 0.1,
+		Decimals = 0.01,
+		Flag = "SilentAim_ShootDelay",
+		Callback = function(v)
+			silentaim.auto_shoot_delay = v
+		end
+	})
+
+	-- Checks Section
+	local ChecksSection = RageTab:Section({Name = "Silent Aim Checks", Side = 2})
+
+	ChecksSection:Toggle({
+		Name = "Wall Check",
+		Flag = "SilentAim_WallCheck",
+		Default = true,
+		Callback = function(v)
+			silentaim.checks.wall_check = v
+		end
+	})
+
+	ChecksSection:Toggle({
+		Name = "Visible Check",
+		Flag = "SilentAim_VisibleCheck",
+		Default = true,
+		Callback = function(v)
+			silentaim.checks.visible_check = v
+		end
+	})
+
+	ChecksSection:Toggle({
+		Name = "Forcefield Check",
+		Flag = "SilentAim_ForcefieldCheck",
+		Default = true,
+		Callback = function(v)
+			silentaim.checks.forcefield_check = v
+		end
+	})
+
+	ChecksSection:Toggle({
+		Name = "Knocked Check",
+		Flag = "SilentAim_KnockedCheck",
+		Default = true,
+		Callback = function(v)
+			silentaim.checks.knocked_check = v
+		end
+	})
+
+	ChecksSection:Toggle({
+		Name = "Dead Check",
+		Flag = "SilentAim_DeadCheck",
+		Default = true,
+		Callback = function(v)
+			silentaim.checks.dead_check = v
+		end
+	})
+
+	ChecksSection:Toggle({
+		Name = "Team Check",
+		Flag = "SilentAim_TeamCheck",
+		Default = false,
+		Callback = function(v)
+			silentaim.checks.team_check = v
+		end
+	})
+
+	-- === VOID SECTION ===
+	local VoidSection = RageTab:Section({Name = "Anti Aim"})
+
+	VoidSection:Dropdown({
+		Name = "Void Mode",
+		Flag = "Void_Mode",
+		Default = "Off",
+		Items = {"Off", "Permanent Void", "Void Spam"},
+		Callback = function(value)
+			voidmeow.selected_mode = value
+			if value == "Off" then
+				voidmeow.enabled = false
+				voidmeow.spam_enabled = false
+			end
+		end
+	})
+
+	local function setVoidActive(active)
+		if voidmeow.selected_mode == "Off" then
+			voidmeow.enabled = false
+			voidmeow.spam_enabled = false
+		else
+			voidmeow.enabled = active and (voidmeow.selected_mode == "Permanent Void")
+			voidmeow.spam_enabled = active and (voidmeow.selected_mode == "Void Spam")
+		end
+	end
+
+	VoidSection:Toggle({
+		Name = "Enabled",
+		Flag = "Void_Enabled",
+		Default = false,
+		Callback = setVoidActive
+	}):Keybind({
+		Name = "Hotkey",
+		Flag = "Void_Hotkey",
+		Default = Enum.KeyCode.V,
+		Mode = "Toggle",
+		Callback = function(value)
+			setVoidActive(value)
+		end
+	})
+
+	VoidSection:Slider({
+		Name = "TP Speed",
+		Min = 1,
+		Max = 10,
+		Default = 3,
+		Decimals = 1,
+		Flag = "Void_TeleportSpeed",
+		Callback = function(v)
+			voidmeow.teleport_speed = math.floor(v)
+		end
+	})
+
+	VoidSection:Slider({
+		Name = "Void Height",
+		Min = -1000,
+		Max = -100,
+		Default = -400,
+		Decimals = 1,
+		Flag = "Void_Height",
+		Callback = function(v)
+			voidmeow.void_height_min = v
+			voidmeow.void_height_max = v + 200
+		end
+	})
+
+	VoidSection:Slider({
+		Name = "Void Range",
+		Min = 50,
+		Max = 10000,
+		Default = 5000,
+		Decimals = 1,
+		Flag = "Void_Range",
+		Callback = function(v)
+			voidmeow.void_range = v
+		end
+	})
+
+	VoidSection:Toggle({
+		Name = "Show Indicator",
+		Flag = "Void_ShowIndicator",
+		Default = true,
+		Callback = function(v)
+			voidmeow.show_indicator = v
+		end
+	})
+
+	-- === SPAM SETTINGS ===
 	local SpamSection = RageTab:Section({Name = "Spam Settings"})
-	SpamSection:Slider({Name = "Void Time", Min = 0.05, Max = 1, Default = 0.15, Decimals = 0.01, Flag = "Void_VoidTime", Callback = function(Value)
-		voidmeow.void_time = Value
-	end})
-	SpamSection:Slider({Name = "Ground Time", Min = 0.01, Max = 0.5, Default = 0.05, Decimals = 0.01, Flag = "Void_GroundTime", Callback = function(Value)
-		voidmeow.normal_time = Value
-	end})
 
-	local AdvancedSection = RageTab:Section({Name = "Advanced"})
-	AdvancedSection:Toggle({Name = "Show Indicator", Flag = "Void_ShowIndicator", Default = true, Callback = function(Value)
-		voidmeow.show_indicator = Value
-	end})
+	SpamSection:Slider({
+		Name = "Void Time",
+		Min = 0.05,
+		Max = 1,
+		Default = 0.15,
+		Decimals = 0.01,
+		Flag = "Void_VoidTime",
+		Callback = function(v)
+			voidmeow.void_time = v
+		end
+	})
 
-	-- Force Hit Section
-	local ForceHitSection = RageTab:Section({Name = "Force Hit"})
-	ForceHitSection:Toggle({Name = "Force Hit", Flag = "ForceHit_Enabled", Default = false, Callback = function(Value)
-		voidmeow.force_hit_enabled = Value
-	end}):Keybind({Name = "Force Hit Hotkey", Flag = "ForceHit_Hotkey", Default = Enum.KeyCode.F, Mode = "Hold", Callback = function(Value)
-		voidmeow.force_hit_active = Value
-	end})
-	ForceHitSection:Toggle({Name = "Auto Fire", Flag = "ForceHit_AutoFire", Default = false, Callback = function(Value)
-		voidmeow.force_hit_autofire = Value
-	end})
-	ForceHitSection:Toggle({Name = "Wall Check", Flag = "ForceHit_WallCheck", Default = true, Callback = function(Value)
-		voidmeow.force_hit_wall_check = Value
-	end})
-	ForceHitSection:Toggle({Name = "ForceField Check", Flag = "ForceHit_FFCheck", Default = true, Callback = function(Value)
-		voidmeow.force_hit_forcefield_check = Value
-	end})
-	ForceHitSection:Slider({Name = "Shoot Delay", Min = 0.05, Max = 2, Default = 0.1, Decimals = 0.01, Flag = "ForceHit_Delay", Callback = function(Value)
-		voidmeow.force_hit_delay = Value
-	end})
+	SpamSection:Slider({
+		Name = "Ground Time",
+		Min = 0.01,
+		Max = 0.5,
+		Default = 0.05,
+		Decimals = 0.01,
+		Flag = "Void_GroundTime",
+		Callback = function(v)
+			voidmeow.normal_time = v
+		end
+	})
 else
-	warn("RageTab not found - UI elements will not be created")
+	warn("RageTab not found")
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
