@@ -198,7 +198,7 @@ local Library do
             ["Page Background"] = FromRGB(10, 10, 10),
             ["Border"] = FromRGB(10, 10, 10),
             ["Outline"] = FromRGB(10, 10, 10),
-            ["Accent"] = FromRGB(255,182,193),
+            ["Accent"] = FromRGB(255,255,255),
             ["Element"] = FromRGB(10, 10, 10),
             ["Hovered Element"] = FromRGB(40, 40, 43),
             ["Text"] = FromRGB(215, 215, 215),
@@ -4898,7 +4898,7 @@ end
 --
 local Window = Library:Window({
     Name = "MEOW.GG - Hood Customs | Ver. 0.7.5 | Build - Private ",
-    Size = UDim2.new(0, 666, 0, 666),
+    Size = UDim2.new(0, 350, 0, 350),
     FadeSpeed = 0.25
 })
 
