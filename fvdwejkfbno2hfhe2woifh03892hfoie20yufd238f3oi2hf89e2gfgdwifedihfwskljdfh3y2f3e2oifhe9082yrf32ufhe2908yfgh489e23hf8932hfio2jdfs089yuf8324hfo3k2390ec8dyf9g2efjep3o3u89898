@@ -4914,21 +4914,980 @@ KeybindList:SetVisibility(false)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 local RageTab = Window:Page({Name = "Rage", Columns = 2, Subtabs = false})
 
+-- Void System Configuration
+local voidmeow = {
+	enabled = false,
+	spam_enabled = false,
+	hook = nil,
+	client_root = nil,
+	saved_cframe = nil,
+	current_void_pos = Vector3.new(0, 0, 0),
 
+	-- Spam settings
+	is_in_void = false,
+	timer = 0,
+	void_time = 0.15,
+	normal_time = 0.05,
 
+	-- Teleport settings
+	teleport_speed = 3,
+	void_height_min = -500,
+	void_height_max = -300,
+	void_range = 5000,
 
+	-- Visual settings
+	show_indicator = true,
+	void_text_color = Color3.fromRGB(255, 50, 50),
+	spam_text_color = Color3.fromRGB(255, 165, 0),
+	ground_text_color = Color3.fromRGB(50, 255, 150),
 
+	-- Force Hit settings
+	force_hit_enabled = false,
+	force_hit_active = false,
+	force_hit_autofire = false,
+	force_hit_delay = 0.1,
+	force_hit_wall_check = true,
+	force_hit_forcefield_check = true,
+	force_hit_last_shot = 0
+}
 
+-- Services
+local run_service = game:GetService("RunService")
+local players = game:GetService("Players")
+local lp = players.LocalPlayer
+local camera = workspace.CurrentCamera
 
+-- Drawing API Elements
+local voidDrawings = {}
+local targetDrawings = {}
+local forceHitDrawings = {}
 
+-- Create void drawings function
+local function createVoidDrawings()
+	voidDrawings.menuBg = Drawing.new("Square")
+	voidDrawings.menuBg.Size = Vector2.new(320, 140)
+	voidDrawings.menuBg.Color = Color3.fromRGB(18, 18, 18)
+	voidDrawings.menuBg.Filled = true
+	voidDrawings.menuBg.Visible = false
+	voidDrawings.menuBg.Transparency = 0.95
+	voidDrawings.menuBg.ZIndex = 1
 
+	voidDrawings.menuBgSecondary = Drawing.new("Square")
+	voidDrawings.menuBgSecondary.Size = Vector2.new(320, 140)
+	voidDrawings.menuBgSecondary.Color = Color3.fromRGB(25, 25, 25)
+	voidDrawings.menuBgSecondary.Filled = true
+	voidDrawings.menuBgSecondary.Visible = false
+	voidDrawings.menuBgSecondary.Transparency = 0.8
+	voidDrawings.menuBgSecondary.ZIndex = 1
 
+	voidDrawings.menuOutline = Drawing.new("Square")
+	voidDrawings.menuOutline.Size = Vector2.new(320, 140)
+	voidDrawings.menuOutline.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.menuOutline.Filled = false
+	voidDrawings.menuOutline.Visible = false
+	voidDrawings.menuOutline.Transparency = 0.3
+	voidDrawings.menuOutline.Thickness = 1
+	voidDrawings.menuOutline.ZIndex = 2
 
+	voidDrawings.menuGlow = Drawing.new("Square")
+	voidDrawings.menuGlow.Size = Vector2.new(316, 136)
+	voidDrawings.menuGlow.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.menuGlow.Filled = false
+	voidDrawings.menuGlow.Visible = false
+	voidDrawings.menuGlow.Transparency = 0.15
+	voidDrawings.menuGlow.Thickness = 1
+	voidDrawings.menuGlow.ZIndex = 2
 
+	voidDrawings.brandText = Drawing.new("Text")
+	voidDrawings.brandText.Text = "MEOW.GG"
+	voidDrawings.brandText.Size = 18
+	voidDrawings.brandText.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.brandText.Center = false
+	voidDrawings.brandText.Outline = true
+	voidDrawings.brandText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.brandText.Visible = false
+	voidDrawings.brandText.ZIndex = 3
 
+	voidDrawings.brandLine = Drawing.new("Line")
+	voidDrawings.brandLine.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.brandLine.Thickness = 2
+	voidDrawings.brandLine.Visible = false
+	voidDrawings.brandLine.Transparency = 0.8
+	voidDrawings.brandLine.ZIndex = 3
 
+	voidDrawings.statusDot = Drawing.new("Circle")
+	voidDrawings.statusDot.Radius = 6
+	voidDrawings.statusDot.Color = Color3.fromRGB(255, 50, 50)
+	voidDrawings.statusDot.Filled = true
+	voidDrawings.statusDot.Visible = false
+	voidDrawings.statusDot.Transparency = 1
+	voidDrawings.statusDot.NumSides = 32
+	voidDrawings.statusDot.ZIndex = 4
+
+	voidDrawings.statusDotGlow = Drawing.new("Circle")
+	voidDrawings.statusDotGlow.Radius = 9
+	voidDrawings.statusDotGlow.Color = Color3.fromRGB(255, 50, 50)
+	voidDrawings.statusDotGlow.Filled = true
+	voidDrawings.statusDotGlow.Visible = false
+	voidDrawings.statusDotGlow.Transparency = 0.3
+	voidDrawings.statusDotGlow.NumSides = 32
+	voidDrawings.statusDotGlow.ZIndex = 3
+
+	voidDrawings.dividerLine = Drawing.new("Line")
+	voidDrawings.dividerLine.Color = Color3.fromRGB(60, 60, 60)
+	voidDrawings.dividerLine.Thickness = 1
+	voidDrawings.dividerLine.Visible = false
+	voidDrawings.dividerLine.Transparency = 0.6
+	voidDrawings.dividerLine.ZIndex = 3
+
+	voidDrawings.positionLabel = Drawing.new("Text")
+	voidDrawings.positionLabel.Text = "POS"
+	voidDrawings.positionLabel.Size = 11
+	voidDrawings.positionLabel.Color = Color3.fromRGB(120, 120, 120)
+	voidDrawings.positionLabel.Center = false
+	voidDrawings.positionLabel.Outline = true
+	voidDrawings.positionLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.positionLabel.Visible = false
+	voidDrawings.positionLabel.ZIndex = 3
+
+	voidDrawings.positionText = Drawing.new("Text")
+	voidDrawings.positionText.Text = "(0, 0, 0)"
+	voidDrawings.positionText.Size = 13
+	voidDrawings.positionText.Color = Color3.fromRGB(220, 220, 220)
+	voidDrawings.positionText.Center = false
+	voidDrawings.positionText.Outline = true
+	voidDrawings.positionText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.positionText.Visible = false
+	voidDrawings.positionText.ZIndex = 3
+
+	voidDrawings.modeLabel = Drawing.new("Text")
+	voidDrawings.modeLabel.Text = "MODE"
+	voidDrawings.modeLabel.Size = 11
+	voidDrawings.modeLabel.Color = Color3.fromRGB(120, 120, 120)
+	voidDrawings.modeLabel.Center = false
+	voidDrawings.modeLabel.Outline = true
+	voidDrawings.modeLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.modeLabel.Visible = false
+	voidDrawings.modeLabel.ZIndex = 3
+
+	voidDrawings.modeText = Drawing.new("Text")
+	voidDrawings.modeText.Text = "Inactive"
+	voidDrawings.modeText.Size = 13
+	voidDrawings.modeText.Color = Color3.fromRGB(220, 220, 220)
+	voidDrawings.modeText.Center = false
+	voidDrawings.modeText.Outline = true
+	voidDrawings.modeText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.modeText.Visible = false
+	voidDrawings.modeText.ZIndex = 3
+
+	voidDrawings.distanceLabel = Drawing.new("Text")
+	voidDrawings.distanceLabel.Text = "DIST"
+	voidDrawings.distanceLabel.Size = 11
+	voidDrawings.distanceLabel.Color = Color3.fromRGB(120, 120, 120)
+	voidDrawings.distanceLabel.Center = false
+	voidDrawings.distanceLabel.Outline = true
+	voidDrawings.distanceLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.distanceLabel.Visible = false
+	voidDrawings.distanceLabel.ZIndex = 3
+
+	voidDrawings.distanceText = Drawing.new("Text")
+	voidDrawings.distanceText.Text = "0 studs"
+	voidDrawings.distanceText.Size = 13
+	voidDrawings.distanceText.Color = Color3.fromRGB(220, 220, 220)
+	voidDrawings.distanceText.Center = false
+	voidDrawings.distanceText.Outline = true
+	voidDrawings.distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	voidDrawings.distanceText.Visible = false
+	voidDrawings.distanceText.ZIndex = 3
+
+	voidDrawings.positionGlow = Drawing.new("Circle")
+	voidDrawings.positionGlow.Radius = 14
+	voidDrawings.positionGlow.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.positionGlow.Filled = true
+	voidDrawings.positionGlow.Visible = false
+	voidDrawings.positionGlow.Transparency = 0.2
+	voidDrawings.positionGlow.NumSides = 32
+	voidDrawings.positionGlow.ZIndex = 8
+
+	voidDrawings.positionDotOutline = Drawing.new("Circle")
+	voidDrawings.positionDotOutline.Radius = 9
+	voidDrawings.positionDotOutline.Color = Color3.fromRGB(40, 40, 40)
+	voidDrawings.positionDotOutline.Filled = true
+	voidDrawings.positionDotOutline.Visible = false
+	voidDrawings.positionDotOutline.Transparency = 1
+	voidDrawings.positionDotOutline.NumSides = 32
+	voidDrawings.positionDotOutline.ZIndex = 9
+
+	voidDrawings.positionDot = Drawing.new("Circle")
+	voidDrawings.positionDot.Radius = 7
+	voidDrawings.positionDot.Color = Color3.fromRGB(255, 255, 255)
+	voidDrawings.positionDot.Filled = true
+	voidDrawings.positionDot.Visible = false
+	voidDrawings.positionDot.Transparency = 1
+	voidDrawings.positionDot.NumSides = 32
+	voidDrawings.positionDot.ZIndex = 10
+end
+
+-- Create target drawings function
+local function createTargetDrawings()
+	targetDrawings.menuBg = Drawing.new("Square")
+	targetDrawings.menuBg.Size = Vector2.new(280, 120)
+	targetDrawings.menuBg.Color = Color3.fromRGB(18, 18, 18)
+	targetDrawings.menuBg.Filled = true
+	targetDrawings.menuBg.Visible = false
+	targetDrawings.menuBg.Transparency = 0.95
+	targetDrawings.menuBg.ZIndex = 1
+
+	targetDrawings.menuBgSecondary = Drawing.new("Square")
+	targetDrawings.menuBgSecondary.Size = Vector2.new(280, 120)
+	targetDrawings.menuBgSecondary.Color = Color3.fromRGB(25, 25, 25)
+	targetDrawings.menuBgSecondary.Filled = true
+	targetDrawings.menuBgSecondary.Visible = false
+	targetDrawings.menuBgSecondary.Transparency = 0.8
+	targetDrawings.menuBgSecondary.ZIndex = 1
+
+	targetDrawings.menuOutline = Drawing.new("Square")
+	targetDrawings.menuOutline.Size = Vector2.new(280, 120)
+	targetDrawings.menuOutline.Color = Color3.fromRGB(255, 255, 255)
+	targetDrawings.menuOutline.Filled = false
+	targetDrawings.menuOutline.Visible = false
+	targetDrawings.menuOutline.Transparency = 0.3
+	targetDrawings.menuOutline.Thickness = 1
+	targetDrawings.menuOutline.ZIndex = 2
+
+	targetDrawings.menuGlow = Drawing.new("Square")
+	targetDrawings.menuGlow.Size = Vector2.new(276, 116)
+	targetDrawings.menuGlow.Color = Color3.fromRGB(255, 255, 255)
+	targetDrawings.menuGlow.Filled = false
+	targetDrawings.menuGlow.Visible = false
+	targetDrawings.menuGlow.Transparency = 0.15
+	targetDrawings.menuGlow.Thickness = 1
+	targetDrawings.menuGlow.ZIndex = 2
+
+	targetDrawings.targetLockedText = Drawing.new("Text")
+	targetDrawings.targetLockedText.Text = "TARGET LOCKED"
+	targetDrawings.targetLockedText.Size = 16
+	targetDrawings.targetLockedText.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.targetLockedText.Center = false
+	targetDrawings.targetLockedText.Outline = true
+	targetDrawings.targetLockedText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.targetLockedText.Visible = false
+	targetDrawings.targetLockedText.ZIndex = 3
+
+	targetDrawings.lockDot = Drawing.new("Circle")
+	targetDrawings.lockDot.Radius = 6
+	targetDrawings.lockDot.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.lockDot.Filled = true
+	targetDrawings.lockDot.Visible = false
+	targetDrawings.lockDot.Transparency = 1
+	targetDrawings.lockDot.NumSides = 32
+	targetDrawings.lockDot.ZIndex = 4
+
+	targetDrawings.lockDotGlow = Drawing.new("Circle")
+	targetDrawings.lockDotGlow.Radius = 9
+	targetDrawings.lockDotGlow.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.lockDotGlow.Filled = true
+	targetDrawings.lockDotGlow.Visible = false
+	targetDrawings.lockDotGlow.Transparency = 0.3
+	targetDrawings.lockDotGlow.NumSides = 32
+	targetDrawings.lockDotGlow.ZIndex = 3
+
+	targetDrawings.dividerLine = Drawing.new("Line")
+	targetDrawings.dividerLine.Color = Color3.fromRGB(60, 60, 60)
+	targetDrawings.dividerLine.Thickness = 1
+	targetDrawings.dividerLine.Visible = false
+	targetDrawings.dividerLine.Transparency = 0.6
+	targetDrawings.dividerLine.ZIndex = 3
+
+	targetDrawings.nameLabel = Drawing.new("Text")
+	targetDrawings.nameLabel.Text = "NAME"
+	targetDrawings.nameLabel.Size = 11
+	targetDrawings.nameLabel.Color = Color3.fromRGB(120, 120, 120)
+	targetDrawings.nameLabel.Center = false
+	targetDrawings.nameLabel.Outline = true
+	targetDrawings.nameLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.nameLabel.Visible = false
+	targetDrawings.nameLabel.ZIndex = 3
+
+	targetDrawings.nameText = Drawing.new("Text")
+	targetDrawings.nameText.Text = "None"
+	targetDrawings.nameText.Size = 13
+	targetDrawings.nameText.Color = Color3.fromRGB(220, 220, 220)
+	targetDrawings.nameText.Center = false
+	targetDrawings.nameText.Outline = true
+	targetDrawings.nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.nameText.Visible = false
+	targetDrawings.nameText.ZIndex = 3
+
+	targetDrawings.healthLabel = Drawing.new("Text")
+	targetDrawings.healthLabel.Text = "HEALTH"
+	targetDrawings.healthLabel.Size = 11
+	targetDrawings.healthLabel.Color = Color3.fromRGB(120, 120, 120)
+	targetDrawings.healthLabel.Center = false
+	targetDrawings.healthLabel.Outline = true
+	targetDrawings.healthLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.healthLabel.Visible = false
+	targetDrawings.healthLabel.ZIndex = 3
+
+	targetDrawings.healthText = Drawing.new("Text")
+	targetDrawings.healthText.Text = "100"
+	targetDrawings.healthText.Size = 13
+	targetDrawings.healthText.Color = Color3.fromRGB(50, 255, 150)
+	targetDrawings.healthText.Center = false
+	targetDrawings.healthText.Outline = true
+	targetDrawings.healthText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.healthText.Visible = false
+	targetDrawings.healthText.ZIndex = 3
+
+	targetDrawings.distanceLabel = Drawing.new("Text")
+	targetDrawings.distanceLabel.Text = "DIST"
+	targetDrawings.distanceLabel.Size = 11
+	targetDrawings.distanceLabel.Color = Color3.fromRGB(120, 120, 120)
+	targetDrawings.distanceLabel.Center = false
+	targetDrawings.distanceLabel.Outline = true
+	targetDrawings.distanceLabel.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.distanceLabel.Visible = false
+	targetDrawings.distanceLabel.ZIndex = 3
+
+	targetDrawings.distanceText = Drawing.new("Text")
+	targetDrawings.distanceText.Text = "0 studs"
+	targetDrawings.distanceText.Size = 13
+	targetDrawings.distanceText.Color = Color3.fromRGB(220, 220, 220)
+	targetDrawings.distanceText.Center = false
+	targetDrawings.distanceText.Outline = true
+	targetDrawings.distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
+	targetDrawings.distanceText.Visible = false
+	targetDrawings.distanceText.ZIndex = 3
+
+	targetDrawings.targetIndicatorOuter = Drawing.new("Circle")
+	targetDrawings.targetIndicatorOuter.Radius = 25
+	targetDrawings.targetIndicatorOuter.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.targetIndicatorOuter.Filled = false
+	targetDrawings.targetIndicatorOuter.Visible = false
+	targetDrawings.targetIndicatorOuter.Transparency = 0.8
+	targetDrawings.targetIndicatorOuter.Thickness = 2
+	targetDrawings.targetIndicatorOuter.NumSides = 32
+	targetDrawings.targetIndicatorOuter.ZIndex = 11
+
+	targetDrawings.targetIndicatorInner = Drawing.new("Circle")
+	targetDrawings.targetIndicatorInner.Radius = 15
+	targetDrawings.targetIndicatorInner.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.targetIndicatorInner.Filled = false
+	targetDrawings.targetIndicatorInner.Visible = false
+	targetDrawings.targetIndicatorInner.Transparency = 1
+	targetDrawings.targetIndicatorInner.Thickness = 2
+	targetDrawings.targetIndicatorInner.NumSides = 32
+	targetDrawings.targetIndicatorInner.ZIndex = 12
+
+	targetDrawings.targetIndicatorCenter = Drawing.new("Circle")
+	targetDrawings.targetIndicatorCenter.Radius = 4
+	targetDrawings.targetIndicatorCenter.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.targetIndicatorCenter.Filled = true
+	targetDrawings.targetIndicatorCenter.Visible = false
+	targetDrawings.targetIndicatorCenter.Transparency = 1
+	targetDrawings.targetIndicatorCenter.NumSides = 32
+	targetDrawings.targetIndicatorCenter.ZIndex = 13
+
+	targetDrawings.crosshairLineTop = Drawing.new("Line")
+	targetDrawings.crosshairLineTop.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.crosshairLineTop.Thickness = 2
+	targetDrawings.crosshairLineTop.Visible = false
+	targetDrawings.crosshairLineTop.Transparency = 1
+	targetDrawings.crosshairLineTop.ZIndex = 12
+
+	targetDrawings.crosshairLineBottom = Drawing.new("Line")
+	targetDrawings.crosshairLineBottom.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.crosshairLineBottom.Thickness = 2
+	targetDrawings.crosshairLineBottom.Visible = false
+	targetDrawings.crosshairLineBottom.Transparency = 1
+	targetDrawings.crosshairLineBottom.ZIndex = 12
+
+	targetDrawings.crosshairLineLeft = Drawing.new("Line")
+	targetDrawings.crosshairLineLeft.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.crosshairLineLeft.Thickness = 2
+	targetDrawings.crosshairLineLeft.Visible = false
+	targetDrawings.crosshairLineLeft.Transparency = 1
+	targetDrawings.crosshairLineLeft.ZIndex = 12
+
+	targetDrawings.crosshairLineRight = Drawing.new("Line")
+	targetDrawings.crosshairLineRight.Color = Color3.fromRGB(255, 50, 50)
+	targetDrawings.crosshairLineRight.Thickness = 2
+	targetDrawings.crosshairLineRight.Visible = false
+	targetDrawings.crosshairLineRight.Transparency = 1
+	targetDrawings.crosshairLineRight.ZIndex = 12
+end
+
+-- Create SIMPLE force hit drawings (DOT + RING ONLY)
+local function createForceHitDrawings()
+	forceHitDrawings.targetDot = Drawing.new("Circle")
+	forceHitDrawings.targetDot.Radius = 5
+	forceHitDrawings.targetDot.Color = Color3.fromRGB(255, 50, 50)
+	forceHitDrawings.targetDot.Filled = true
+	forceHitDrawings.targetDot.Visible = false
+	forceHitDrawings.targetDot.Transparency = 1
+	forceHitDrawings.targetDot.ZIndex = 100
+
+	forceHitDrawings.targetRing = Drawing.new("Circle")
+	forceHitDrawings.targetRing.Radius = 18
+	forceHitDrawings.targetRing.Color = Color3.fromRGB(255, 50, 50)
+	forceHitDrawings.targetRing.Filled = false
+	forceHitDrawings.targetRing.Visible = false
+	forceHitDrawings.targetRing.Transparency = 0.7
+	forceHitDrawings.targetRing.Thickness = 2
+	forceHitDrawings.targetRing.ZIndex = 99
+end
+
+createVoidDrawings()
+createTargetDrawings()
+createForceHitDrawings()
+
+-- Update void menu position
+local function updateVoidMenuPosition()
+	local viewportSize = camera.ViewportSize
+	local menuX = (viewportSize.X / 2) - 160
+	local menuY = viewportSize.Y - 160
+	voidDrawings.menuBg.Position = Vector2.new(menuX, menuY)
+	voidDrawings.menuBgSecondary.Position = Vector2.new(menuX + 2, menuY + 2)
+	voidDrawings.menuOutline.Position = Vector2.new(menuX, menuY)
+	voidDrawings.menuGlow.Position = Vector2.new(menuX + 2, menuY + 2)
+	voidDrawings.brandText.Position = Vector2.new(menuX + 15, menuY + 15)
+	voidDrawings.brandLine.From = Vector2.new(menuX + 15, menuY + 40)
+	voidDrawings.brandLine.To = Vector2.new(menuX + 130, menuY + 40)
+	voidDrawings.statusDotGlow.Position = Vector2.new(menuX + 290, menuY + 25)
+	voidDrawings.statusDot.Position = Vector2.new(menuX + 290, menuY + 25)
+	voidDrawings.dividerLine.From = Vector2.new(menuX + 15, menuY + 52)
+	voidDrawings.dividerLine.To = Vector2.new(menuX + 305, menuY + 52)
+	voidDrawings.positionLabel.Position = Vector2.new(menuX + 15, menuY + 62)
+	voidDrawings.positionText.Position = Vector2.new(menuX + 60, menuY + 62)
+	voidDrawings.modeLabel.Position = Vector2.new(menuX + 15, menuY + 87)
+	voidDrawings.modeText.Position = Vector2.new(menuX + 60, menuY + 87)
+	voidDrawings.distanceLabel.Position = Vector2.new(menuX + 15, menuY + 112)
+	voidDrawings.distanceText.Position = Vector2.new(menuX + 60, menuY + 112)
+end
+
+-- Update target menu position
+local function updateTargetMenuPosition()
+	local viewportSize = camera.ViewportSize
+	local menuX = 20
+	local menuY = (viewportSize.Y / 2) - 60
+	targetDrawings.menuBg.Position = Vector2.new(menuX, menuY)
+	targetDrawings.menuBgSecondary.Position = Vector2.new(menuX + 2, menuY + 2)
+	targetDrawings.menuOutline.Position = Vector2.new(menuX, menuY)
+	targetDrawings.menuGlow.Position = Vector2.new(menuX + 2, menuY + 2)
+	targetDrawings.targetLockedText.Position = Vector2.new(menuX + 15, menuY + 15)
+	targetDrawings.lockDotGlow.Position = Vector2.new(menuX + 250, menuY + 23)
+	targetDrawings.lockDot.Position = Vector2.new(menuX + 250, menuY + 23)
+	targetDrawings.dividerLine.From = Vector2.new(menuX + 15, menuY + 40)
+	targetDrawings.dividerLine.To = Vector2.new(menuX + 265, menuY + 40)
+	targetDrawings.nameLabel.Position = Vector2.new(menuX + 15, menuY + 50)
+	targetDrawings.nameText.Position = Vector2.new(menuX + 70, menuY + 50)
+	targetDrawings.healthLabel.Position = Vector2.new(menuX + 15, menuY + 72)
+	targetDrawings.healthText.Position = Vector2.new(menuX + 70, menuY + 72)
+	targetDrawings.distanceLabel.Position = Vector2.new(menuX + 15, menuY + 94)
+	targetDrawings.distanceText.Position = Vector2.new(menuX + 70, menuY + 94)
+end
+
+-- Update client root
+local function updateClientRoot()
+	local character = lp.Character
+	if character then
+		voidmeow.client_root = character:FindFirstChild("HumanoidRootPart")
+	end
+end
+lp.CharacterAdded:Connect(updateClientRoot)
+updateClientRoot()
+
+-- Core void functions
+local function enable_void_hook()
+	if not voidmeow.hook then
+		voidmeow.hook = hookmetamethod(game, "__index", function(self, index)
+			if not checkcaller() and (voidmeow.enabled or voidmeow.spam_enabled) and voidmeow.saved_cframe and index == "CFrame" and self == voidmeow.client_root then
+				return voidmeow.saved_cframe
+			end
+			return voidmeow.hook(self, index)
+		end)
+	end
+end
+
+local function disable_void_hook()
+	if voidmeow.hook then
+		unhookmetamethod(game, "__index", voidmeow.hook)
+		voidmeow.hook = nil
+	end
+end
+
+local function enhancedVoidTeleport()
+	local basePos = voidmeow.client_root.Position
+	local voidPos = Vector3.new(
+		basePos.X + math.random(-voidmeow.void_range, voidmeow.void_range),
+		math.random(voidmeow.void_height_min, voidmeow.void_height_max),
+		basePos.Z + math.random(-voidmeow.void_range, voidmeow.void_range)
+	)
+	local void_cframe = CFrame.new(voidPos)
+	voidmeow.current_void_pos = void_cframe.Position
+	voidmeow.client_root.CFrame = void_cframe
+end
+
+-- Force Hit function
+local function checkWallBetween(from, to)
+	local ray = Ray.new(from, (to - from))
+	local part, position = workspace:FindPartOnRayWithIgnoreList(ray, {lp.Character})
+	if part then
+		local distance = (position - from).Magnitude
+		local targetDistance = (to - from).Magnitude
+		return distance < targetDistance
+	end
+	return false
+end
+
+local function hasForceField(character)
+	return character:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function canShootTarget(target)
+	if not target or not target.Character then return false end
+	local targetChar = target.Character
+	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+	if not targetHRP then return false end
+
+	local humanoid = targetChar:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return false end
+
+	if voidmeow.force_hit_forcefield_check and hasForceField(targetChar) then return false end
+	if voidmeow.force_hit_wall_check and voidmeow.client_root and checkWallBetween(voidmeow.client_root.Position, targetHRP.Position) then
+		return false
+	end
+	return true
+end
+
+-- FIXED FORCE HIT EXECUTION
+local function executeForceHit()
+	if not voidmeow.force_hit_enabled then return end
+	local shouldFire = voidmeow.force_hit_autofire or voidmeow.force_hit_active
+	if not shouldFire then return end
+
+	local currentTime = tick()
+	if currentTime - voidmeow.force_hit_last_shot < voidmeow.force_hit_delay then return end
+
+	local target = TargetMgr and TargetMgr:get()
+	if not target or not canShootTarget(target) then return end
+
+	local targetChar = target.Character
+	local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+	if not targetHRP or not voidmeow.client_root then return end
+
+	local originalCFrame = voidmeow.client_root.CFrame
+	local previousSavedCFrame = voidmeow.saved_cframe
+
+	local behindCFrame = targetHRP.CFrame * CFrame.new(0, 0, -3)
+	voidmeow.saved_cframe = behindCFrame
+	voidmeow.client_root.CFrame = behindCFrame
+	voidmeow.force_hit_last_shot = currentTime
+
+	task.wait()
+	voidmeow.client_root.CFrame = originalCFrame
+	voidmeow.saved_cframe = previousSavedCFrame
+end
+
+-- Simple force hit indicator (DOT + RING)
+local function updateForceHitIndicator()
+	local target = TargetMgr and TargetMgr:get()
+	if target and target.Character and voidmeow.force_hit_enabled then
+		local head = target.Character:FindFirstChild("Head")
+		if head then
+			local vector, onScreen = camera:WorldToViewportPoint(head.Position)
+			if onScreen then
+				local screenPos = Vector2.new(vector.X, vector.Y)
+				forceHitDrawings.targetDot.Position = screenPos
+				forceHitDrawings.targetRing.Position = screenPos
+				forceHitDrawings.targetDot.Visible = true
+				forceHitDrawings.targetRing.Visible = true
+
+				local angle = tick() * 3
+				forceHitDrawings.targetRing.Radius = 16 + math.sin(angle) * 3
+				return
+			end
+		end
+	end
+	forceHitDrawings.targetDot.Visible = false
+	forceHitDrawings.targetRing.Visible = false
+end
+
+-- Set visibility helpers
+local function setVoidMenuVisible(visible)
+	for _, drawing in pairs(voidDrawings) do
+		if drawing ~= voidDrawings.positionDot and drawing ~= voidDrawings.positionDotOutline and drawing ~= voidDrawings.positionGlow then
+			drawing.Visible = visible
+		end
+	end
+end
+
+local function setTargetMenuVisible(visible)
+	for _, drawing in pairs(targetDrawings) do
+		drawing.Visible = visible
+	end
+end
+
+-- Update void label
+local function updateVoidLabel()
+	if voidmeow.enabled then
+		local pos = voidmeow.current_void_pos
+		voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
+		voidDrawings.modeText.Text = "Permanent Void"
+		voidDrawings.modeText.Color = voidmeow.void_text_color
+		voidDrawings.statusDot.Color = voidmeow.void_text_color
+		voidDrawings.statusDotGlow.Color = voidmeow.void_text_color
+		if voidmeow.client_root then
+			local distance = (voidmeow.client_root.Position - pos).Magnitude
+			voidDrawings.distanceText.Text = string.format("%.0f studs", distance)
+		end
+		if voidmeow.show_indicator then
+			setVoidMenuVisible(true)
+			updateVoidMenuPosition()
+		end
+	elseif voidmeow.spam_enabled then
+		if voidmeow.is_in_void then
+			local pos = voidmeow.current_void_pos
+			voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
+			voidDrawings.modeText.Text = "Void Spamming"
+			voidDrawings.modeText.Color = voidmeow.spam_text_color
+			voidDrawings.statusDot.Color = voidmeow.spam_text_color
+			voidDrawings.statusDotGlow.Color = voidmeow.spam_text_color
+			voidDrawings.positionDot.Color = voidmeow.spam_text_color
+			voidDrawings.positionGlow.Color = voidmeow.spam_text_color
+			if voidmeow.client_root then
+				local distance = (voidmeow.client_root.Position - pos).Magnitude
+				voidDrawings.distanceText.Text = string.format("%.0f studs", distance)
+			end
+		elseif voidmeow.saved_cframe then
+			local pos = voidmeow.saved_cframe.Position
+			voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
+			voidDrawings.modeText.Text = "On Ground"
+			voidDrawings.modeText.Color = voidmeow.ground_text_color
+			voidDrawings.statusDot.Color = voidmeow.ground_text_color
+			voidDrawings.statusDotGlow.Color = voidmeow.ground_text_color
+			voidDrawings.positionDot.Color = voidmeow.ground_text_color
+			voidDrawings.positionGlow.Color = voidmeow.ground_text_color
+			voidDrawings.distanceText.Text = "0 studs"
+		end
+		if voidmeow.show_indicator then
+			setVoidMenuVisible(true)
+			updateVoidMenuPosition()
+		end
+	else
+		setVoidMenuVisible(false)
+		voidDrawings.positionDot.Visible = false
+		voidDrawings.positionDotOutline.Visible = false
+		voidDrawings.positionGlow.Visible = false
+	end
+end
+
+-- Health color
+local function getHealthColor(health, maxHealth)
+	local percent = health / maxHealth
+	if percent > 0.6 then return Color3.fromRGB(50, 255, 150)
+	elseif percent > 0.3 then return Color3.fromRGB(255, 200, 50)
+	else return Color3.fromRGB(255, 50, 50) end
+end
+
+-- FIXED updateTargetLabel (NO 'pretended')
+local function updateTargetLabel()
+	local target = TargetMgr and TargetMgr:get()
+	if target and target.Character then
+		local char = target.Character
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hum and hum.Health > 0 and hrp then
+			targetDrawings.nameText.Text = target.Name
+			local health = math.floor(hum.Health)
+			local maxHealth = math.floor(hum.MaxHealth)
+			targetDrawings.healthText.Text = string.format("%d / %d", health, maxHealth)
+			targetDrawings.healthText.Color = getHealthColor(health, maxHealth)
+			if voidmeow.client_root then
+				local distance = (voidmeow.client_root.Position - hrp.Position).Magnitude
+				targetDrawings.distanceText.Text = string.format("%.0f studs", distance)
+			end
+			setTargetMenuVisible(true)
+			updateTargetMenuPosition()
+			return true
+		end
+	end
+	setTargetMenuVisible(false)
+	targetDrawings.targetIndicatorOuter.Visible = false
+	targetDrawings.targetIndicatorInner.Visible = false
+	targetDrawings.targetIndicatorCenter.Visible = false
+	targetDrawings.crosshairLineTop.Visible = false
+	targetDrawings.crosshairLineBottom.Visible = false
+	targetDrawings.crosshairLineLeft.Visible = false
+	targetDrawings.crosshairLineRight.Visible = false  -- FIXED
+	return false
+end
+
+-- Update target indicator
+local function updateTargetIndicator()
+	local target = TargetMgr and TargetMgr:get()
+	if target and target.Character then
+		local head = target.Character:FindFirstChild("Head")
+		if head then
+			local vector, onScreen = camera:WorldToViewportPoint(head.Position)
+			if onScreen then
+				local screenPos = Vector2.new(vector.X, vector.Y)
+				local outerRadius = 25 + math.sin(tick() * 3) * 3
+				local innerRadius = 15 + math.sin(tick() * 4) * 2
+
+				targetDrawings.targetIndicatorOuter.Position = screenPos
+				targetDrawings.targetIndicatorOuter.Radius = outerRadius
+				targetDrawings.targetIndicatorOuter.Visible = true
+
+				targetDrawings.targetIndicatorInner.Position = screenPos
+				targetDrawings.targetIndicatorInner.Radius = innerRadius
+				targetDrawings.targetIndicatorInner.Visible = true
+
+				targetDrawings.targetIndicatorCenter.Position = screenPos
+				targetDrawings.targetIndicatorCenter.Visible = true
+
+				local lineLength = 12
+				local lineGap = 20
+				targetDrawings.crosshairLineTop.From = Vector2.new(screenPos.X, screenPos.Y - lineGap)
+				targetDrawings.crosshairLineTop.To = Vector2.new(screenPos.X, screenPos.Y - lineGap - lineLength)
+				targetDrawings.crosshairLineTop.Visible = true
+
+				targetDrawings.crosshairLineBottom.From = Vector2.new(screenPos.X, screenPos.Y + lineGap)
+				targetDrawings.crosshairLineBottom.To = Vector2.new(screenPos.X, screenPos.Y + lineGap + lineLength)
+				targetDrawings.crosshairLineBottom.Visible = true
+
+				targetDrawings.crosshairLineLeft.From = Vector2.new(screenPos.X - lineGap, screenPos.Y)
+				targetDrawings.crosshairLineLeft.To = Vector2.new(screenPos.X - lineGap - lineLength, screenPos.Y)
+				targetDrawings.crosshairLineLeft.Visible = true
+
+				targetDrawings.crosshairLineRight.From = Vector2.new(screenPos.X + lineGap, screenPos.Y)
+				targetDrawings.crosshairLineRight.To = Vector2.new(screenPos.X + lineGap + lineLength, screenPos.Y)
+				targetDrawings.crosshairLineRight.Visible = true
+
+				local pulse = math.abs(math.sin(tick() * 3))
+				targetDrawings.targetIndicatorOuter.Transparency = 0.6 + (pulse * 0.3)
+				local glowPulse = math.abs(math.sin(tick() * 2))
+				targetDrawings.lockDotGlow.Transparency = 0.2 + (glowPulse * 0.3)
+				return
+			end
+		end
+	end
+	targetDrawings.targetIndicatorOuter.Visible = false
+	targetDrawings.targetIndicatorInner.Visible = false
+	targetDrawings.targetIndicatorCenter.Visible = false
+	targetDrawings.crosshairLineTop.Visible = false
+	targetDrawings.crosshairLineBottom.Visible = false
+	targetDrawings.crosshairLineLeft.Visible = false
+	targetDrawings.crosshairLineRight.Visible = false
+end
+
+-- Update void position indicator
+local function updateVoidPositionIndicator()
+	if voidmeow.show_indicator then
+		local targetPosition
+		local character = lp.Character
+		if voidmeow.enabled then
+			targetPosition = voidmeow.current_void_pos
+		elseif voidmeow.spam_enabled and voidmeow.is_in_void then
+			targetPosition = voidmeow.current_void_pos
+		elseif voidmeow.spam_enabled and voidmeow.saved_cframe and character then
+			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+			if humanoidRootPart then
+				local rootPos = humanoidRootPart.Position
+				local cameraDistance = (camera.CFrame.Position - rootPos).Magnitude
+				local heightAdjustment = math.clamp(cameraDistance * 0.15, 2, 8)
+				targetPosition = rootPos + Vector3.new(0, heightAdjustment, 0)
+			else
+				targetPosition = voidmeow.saved_cframe.Position + Vector3.new(0, 3, 0)
+			end
+		else
+			voidDrawings.positionDot.Visible = false
+			voidDrawings.positionDotOutline.Visible = false
+			voidDrawings.positionGlow.Visible = false
+			return
+		end
+
+		local vector, onScreen = camera:WorldToViewportPoint(targetPosition)
+		if onScreen then
+			local screenPos = Vector2.new(vector.X, vector.Y)
+			voidDrawings.positionGlow.Position = screenPos
+			voidDrawings.positionDotOutline.Position = screenPos
+			voidDrawings.positionDot.Position = screenPos
+			voidDrawings.positionGlow.Visible = true
+			voidDrawings.positionDotOutline.Visible = true
+			voidDrawings.positionDot.Visible = true
+
+			local pulse = math.abs(math.sin(tick() * 3))
+			voidDrawings.positionGlow.Transparency = 0.1 + (pulse * 0.3)
+			local glowPulse = math.abs(math.sin(tick() * 2))
+			voidDrawings.statusDotGlow.Transparency = 0.2 + (glowPulse * 0.3)
+		else
+			voidDrawings.positionDot.Visible = false
+			voidDrawings.positionDotOutline.Visible = false
+			voidDrawings.positionGlow.Visible = false
+		end
+	else
+		voidDrawings.positionDot.Visible = false
+		voidDrawings.positionDotOutline.Visible = false
+		voidDrawings.positionGlow.Visible = false
+	end
+end
+
+-- Main loop
+run_service.Heartbeat:Connect(function(delta)
+	if not voidmeow.client_root then return end
+
+	if voidmeow.enabled or voidmeow.spam_enabled then
+		enable_void_hook()
+
+		if voidmeow.spam_enabled then
+			voidmeow.timer = voidmeow.timer + delta
+			local threshold = voidmeow.is_in_void and voidmeow.void_time or voidmeow.normal_time
+			if voidmeow.timer >= threshold then
+				voidmeow.timer = 0
+				voidmeow.is_in_void = not voidmeow.is_in_void
+			end
+
+			voidmeow.saved_cframe = voidmeow.client_root.CFrame
+			if voidmeow.is_in_void then
+				for i = 1, voidmeow.teleport_speed do
+					enhancedVoidTeleport()
+				end
+			else
+				voidmeow.client_root.CFrame = voidmeow.saved_cframe
+			end
+			run_service.RenderStepped:Wait()
+			voidmeow.client_root.CFrame = voidmeow.saved_cframe
+
+		elseif voidmeow.enabled then
+			voidmeow.saved_cframe = voidmeow.client_root.CFrame
+			for i = 1, voidmeow.teleport_speed do
+				enhancedVoidTeleport()
+			end
+			run_service.RenderStepped:Wait()
+			voidmeow.client_root.CFrame = voidmeow.saved_cframe
+		end
+
+		updateVoidLabel()
+		updateVoidPositionIndicator()
+	else
+		disable_void_hook()
+		voidmeow.saved_cframe = nil
+		voidmeow.is_in_void = false
+		voidmeow.timer = 0
+		setVoidMenuVisible(false)
+		voidDrawings.positionDot.Visible = false
+		voidDrawings.positionDotOutline.Visible = false
+		voidDrawings.positionGlow.Visible = false
+	end
+
+	executeForceHit()
+	updateForceHitIndicator()
+	updateTargetLabel()
+	updateTargetIndicator()
+end)
+
+-- UI Elements
+if RageTab then
+	local VoidSection = RageTab:Section({Name = "Void System"})
+	VoidSection:Toggle({Name = "Void", Flag = "Void_Enabled", Default = false, Callback = function(Value)
+		voidmeow.enabled = Value
+		if Value then voidmeow.spam_enabled = false end
+	end})
+	VoidSection:Toggle({Name = "Void Spam", Flag = "Void_Spam", Default = false, Callback = function(Value)
+		voidmeow.spam_enabled = Value
+		if Value then voidmeow.enabled = false end
+	end})
+	VoidSection:Slider({Name = "Teleport Speed", Min = 1, Max = 10, Default = 3, Decimals = 1, Flag = "Void_TeleportSpeed", Callback = function(Value)
+		voidmeow.teleport_speed = math.floor(Value)
+	end})
+	VoidSection:Slider({Name = "Void Height", Min = -1000, Max = -100, Default = -400, Decimals = 1, Flag = "Void_Height", Callback = function(Value)
+		voidmeow.void_height_min = Value
+		voidmeow.void_height_max = Value + 200
+	end})
+	VoidSection:Slider({Name = "Void Range", Min = 50, Max = 10000, Default = 5000, Decimals = 1, Flag = "Void_Range", Callback = function(Value)
+		voidmeow.void_range = Value
+	end})
+
+	local SpamSection = RageTab:Section({Name = "Spam Settings"})
+	SpamSection:Slider({Name = "Void Time", Min = 0.05, Max = 1, Default = 0.15, Decimals = 0.01, Flag = "Void_VoidTime", Callback = function(Value)
+		voidmeow.void_time = Value
+	end})
+	SpamSection:Slider({Name = "Ground Time", Min = 0.01, Max = 0.5, Default = 0.05, Decimals = 0.01, Flag = "Void_GroundTime", Callback = function(Value)
+		voidmeow.normal_time = Value
+	end})
+
+	local AdvancedSection = RageTab:Section({Name = "Advanced"})
+	AdvancedSection:Toggle({Name = "Show Indicator", Flag = "Void_ShowIndicator", Default = true, Callback = function(Value)
+		voidmeow.show_indicator = Value
+	end})
+
+	-- Force Hit Section
+	local ForceHitSection = RageTab:Section({Name = "Force Hit"})
+	ForceHitSection:Toggle({Name = "Force Hit", Flag = "ForceHit_Enabled", Default = false, Callback = function(Value)
+		voidmeow.force_hit_enabled = Value
+	end}):Keybind({Name = "Force Hit Hotkey", Flag = "ForceHit_Hotkey", Default = Enum.KeyCode.F, Mode = "Hold", Callback = function(Value)
+		voidmeow.force_hit_active = Value
+	end})
+	ForceHitSection:Toggle({Name = "Auto Fire", Flag = "ForceHit_AutoFire", Default = false, Callback = function(Value)
+		voidmeow.force_hit_autofire = Value
+	end})
+	ForceHitSection:Toggle({Name = "Wall Check", Flag = "ForceHit_WallCheck", Default = true, Callback = function(Value)
+		voidmeow.force_hit_wall_check = Value
+	end})
+	ForceHitSection:Toggle({Name = "ForceField Check", Flag = "ForceHit_FFCheck", Default = true, Callback = function(Value)
+		voidmeow.force_hit_forcefield_check = Value
+	end})
+	ForceHitSection:Slider({Name = "Shoot Delay", Min = 0.05, Max = 2, Default = 0.1, Decimals = 0.01, Flag = "ForceHit_Delay", Callback = function(Value)
+		voidmeow.force_hit_delay = Value
+	end})
+else
+	warn("RageTab not found - UI elements will not be created")
+end
 
 
 
@@ -5685,24 +6644,34 @@ local VisualsTab = Window:Page({Name = "Visuals", Columns = 2, Subtabs = false})
 
 
 
-do -- Misc Tab
+do
+    -- Misc Tab
     local MiscTab = Window:Page({Name = "Misc", Columns = 2, Subtabs = false})
-
-    local RunService       = game:GetService("RunService")
+    local RunService = game:GetService("RunService")
     local UserInputService = game:GetService("UserInputService")
-    local Players          = game:GetService("Players")
-    local LocalPlayer      = Players.LocalPlayer
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local TextChatService = game:GetService("TextChatService")
+    local Chat = game:GetService("Chat")
 
     --------------------------------------------------------------------
     -- Variables
     --------------------------------------------------------------------
-    local SpeedEnabled = false;      local SpeedConnection = nil;      local OriginalWalkSpeed = 16
-    local FlyEnabled   = false;      local FlyConnection   = nil;      local FlyBV = nil; local FlyBG = nil
+    local SpeedEnabled = false; local SpeedConnection = nil; local OriginalWalkSpeed = 16
+    local FlyEnabled = false; local FlyConnection = nil; local FlyBV = nil; local FlyBG = nil
     local InfiniteJumpEnabled = false; local InfiniteJumpConnection = nil
-    local NoClipEnabled = false;     local NoClipConnection = nil
-    local FOVEnabled   = false;      local OriginalFOV = 70
-    local AntiFlingEnabled = false;  local AntiFlingConnection = nil
-    local ClickTPEnabled = false;    local ClickTPConnection = nil
+    local NoClipEnabled = false; local NoClipConnection = nil
+    local FOVEnabled = false; local OriginalFOV = 70
+    local AntiFlingEnabled = false; local AntiFlingConnection = nil
+    local ClickTPEnabled = false; local ClickTPConnection = nil
+
+    -- New: Spinbot
+    local SpinbotEnabled = false
+    local SpinbotConnection = nil
+    local SpinSpeed = 100
+
+    -- New: Chat Spy
+    local ChatSpyEnabled = false
 
     --------------------------------------------------------------------
     -- Speed
@@ -5710,12 +6679,12 @@ do -- Misc Tab
     local function EnableSpeed()
         local Char = LocalPlayer.Character
         if not Char then return end
-        local Hum  = Char:FindFirstChildOfClass("Humanoid")
-        local HRP  = Char:FindFirstChild("HumanoidRootPart")
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        local HRP = Char:FindFirstChild("HumanoidRootPart")
         if not Hum or not HRP then return end
 
         local Amount = Library.Flags["Speed_Amount"] or 16
-        local Mode   = Library.Flags["Speed_Mode"]   or "Velocity"
+        local Mode = Library.Flags["Speed_Mode"] or "Velocity"
 
         if Mode == "WalkSpeed" then
             OriginalWalkSpeed = Hum.WalkSpeed
@@ -5724,7 +6693,6 @@ do -- Misc Tab
         end
 
         if SpeedConnection then SpeedConnection:Disconnect() end
-
         SpeedConnection = RunService.RenderStepped:Connect(function()
             if not SpeedEnabled then return end
             local C = LocalPlayer.Character
@@ -5769,12 +6737,12 @@ do -- Misc Tab
         FlyBV = Instance.new("BodyVelocity")
         FlyBV.Velocity = Vector3.new()
         FlyBV.MaxForce = Vector3.new(9e9,9e9,9e9)
-        FlyBV.Parent   = HRP
+        FlyBV.Parent = HRP
 
         FlyBG = Instance.new("BodyGyro")
         FlyBG.MaxTorque = Vector3.new(9e9,9e9,9e9)
-        FlyBG.CFrame    = HRP.CFrame
-        FlyBG.Parent    = HRP
+        FlyBG.CFrame = HRP.CFrame
+        FlyBG.Parent = HRP
 
         FlyConnection = RunService.RenderStepped:Connect(function()
             if not FlyEnabled or not FlyBV or not FlyBV.Parent or not FlyBG or not FlyBG.Parent then return end
@@ -5783,17 +6751,16 @@ do -- Misc Tab
             local R = C:FindFirstChild("HumanoidRootPart")
             if not R then return end
 
-            local Cam   = workspace.CurrentCamera
+            local Cam = workspace.CurrentCamera
             local Speed = Library.Flags["Fly_Speed"] or 50
-
             FlyBG.CFrame = Cam.CFrame
 
             local Dir = Vector3.new()
-            if UserInputService:IsKeyDown(Enum.KeyCode.W)      then Dir += Cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S)      then Dir -= Cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A)      then Dir -= Cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D)      then Dir += Cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space)  then Dir += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then Dir += Cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then Dir -= Cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then Dir -= Cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then Dir += Cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then Dir += Vector3.new(0,1,0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then Dir -= Vector3.new(0,1,0) end
 
             FlyBV.Velocity = Dir * Speed
@@ -5820,10 +6787,11 @@ do -- Misc Tab
 
                 for _, v in pairs(C:GetDescendants()) do
                     if v:IsA("BodyVelocity") or v:IsA("BodyPosition") or v:IsA("BodyAngularVelocity") then
-                        if v.Parent ~= R or (v == FlyBV or v == FlyBG) then v:Destroy() end
+                        if v.Parent ~= R or (v == FlyBV or v == FlyBG) then
+                            v:Destroy()
+                        end
                     end
                 end
-
                 R.AssemblyLinearVelocity = Vector3.new(0, R.AssemblyLinearVelocity.Y, 0)
             end)
         else
@@ -5832,7 +6800,7 @@ do -- Misc Tab
     end
 
     --------------------------------------------------------------------
-    -- Click TP (Bonus Feature!)
+    -- Click TP
     --------------------------------------------------------------------
     local function EnableClickTP()
         if ClickTPConnection then ClickTPConnection:Disconnect() end
@@ -5885,7 +6853,9 @@ do -- Misc Tab
             local C = LocalPlayer.Character
             if C then
                 for _, p in pairs(C:GetDescendants()) do
-                    if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.CanCollide = true end
+                    if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+                        p.CanCollide = true
+                    end
                 end
             end
         end
@@ -5897,19 +6867,92 @@ do -- Misc Tab
     end
 
     --------------------------------------------------------------------
+    -- NEW: Spinbot
+    --------------------------------------------------------------------
+    local function ToggleSpinbot(enabled)
+        SpinbotEnabled = enabled
+        if enabled then
+            local Char = LocalPlayer.Character
+            if not Char or not Char:FindFirstChild("HumanoidRootPart") then return end
+
+            if SpinbotConnection then SpinbotConnection:Disconnect() end
+            SpinbotConnection = RunService.RenderStepped:Connect(function()
+                if not SpinbotEnabled then return end
+                local Root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not Root then return end
+
+                local spin = SpinSpeed
+                Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(spin), 0)
+            end)
+        else
+            if SpinbotConnection then
+                SpinbotConnection:Disconnect()
+                SpinbotConnection = nil
+            end
+        end
+    end
+
+    --------------------------------------------------------------------
+    -- NEW: Chat Spy (Legacy + TextChatService)
+    --------------------------------------------------------------------
+    local function EnableChatSpy()
+        ChatSpyEnabled = true
+
+        -- Legacy Chat
+        if Chat then
+            Chat.Chatted:Connect(function(plr, msg)
+                if plr ~= LocalPlayer and ChatSpyEnabled then
+                    warn(`[CHAT SPY] {plr.Name}: {msg}`)
+                end
+            end)
+        end
+
+        -- TextChatService (New Chat)
+        if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            local function onMessage(channel, messageObj)
+                if not ChatSpyEnabled then return end
+                local speaker = messageObj.TextSource
+                if speaker and speaker ~= LocalPlayer and messageObj.Text then
+                    warn(`[CHAT SPY] {speaker.Name}: {messageObj.Text}`)
+                end
+            end
+
+            local textChannels = TextChatService:WaitForChild("TextChannels")
+            for _, channel in pairs(textChannels:GetChildren()) do
+                if channel:IsA("TextChannel") then
+                    channel.MessageReceived:Connect(function(msg) onMessage(channel, msg) end)
+                end
+            end
+
+            textChannels.ChildAdded:Connect(function(channel)
+                if channel:IsA("TextChannel") and ChatSpyEnabled then
+                    channel.MessageReceived:Connect(function(msg) onMessage(channel, msg) end)
+                end
+            end)
+        end
+    end
+
+    local function DisableChatSpy()
+        ChatSpyEnabled = false
+    end
+
+    --------------------------------------------------------------------
     -- UI
     --------------------------------------------------------------------
     local MovementSection = MiscTab:Section({Name = "Movement", Side = 1})
 
     -- Speed
     MovementSection:Toggle({
-        Name = "Speed", Flag = "Speed_Enabled", Default = false,
+        Name = "Speed",
+        Flag = "Speed_Enabled",
+        Default = false,
         Callback = function(v)
             SpeedEnabled = v
             if v then EnableSpeed() else DisableSpeed() end
         end
     }):Keybind({
-        Flag = "Speed_Keybind", Default = Enum.KeyCode.X,
+        Flag = "Speed_Keybind",
+        Default = Enum.KeyCode.X,
         Callback = function(pressed)
             if not Library.Flags["Speed_Enabled"] then return end
             SpeedEnabled = pressed
@@ -5918,22 +6961,37 @@ do -- Misc Tab
         Mode = "Hold"
     })
 
-    MovementSection:Slider({Name = "Speed Amount", Min = 16, Max = 200, Default = 50, Flag = "Speed_Amount",
-        Callback = function() if SpeedEnabled then DisableSpeed() EnableSpeed() end end})
+    MovementSection:Slider({
+        Name = "Speed Amount",
+        Min = 16, Max = 200, Default = 50,
+        Flag = "Speed_Amount",
+        Callback = function()
+            if SpeedEnabled then DisableSpeed() EnableSpeed() end
+        end
+    })
 
-    MovementSection:Dropdown({Name = "Speed Mode", Flag = "Speed_Mode", Default = "CFrame",
+    MovementSection:Dropdown({
+        Name = "Speed Mode",
+        Flag = "Speed_Mode",
+        Default = "CFrame",
         Items = {"WalkSpeed","CFrame","Velocity"},
-        Callback = function() if SpeedEnabled then DisableSpeed() EnableSpeed() end end})
+        Callback = function()
+            if SpeedEnabled then DisableSpeed() EnableSpeed() end
+        end
+    })
 
     -- Fly
     MovementSection:Toggle({
-        Name = "Fly", Flag = "Fly_Enabled", Default = false,
+        Name = "Fly",
+        Flag = "Fly_Enabled",
+        Default = false,
         Callback = function(v)
             FlyEnabled = v
             if v then EnableFly() else DisableFly() end
         end
     }):Keybind({
-        Flag = "Fly_Keybind", Default = Enum.KeyCode.F,
+        Flag = "Fly_Keybind",
+        Default = Enum.KeyCode.F,
         Callback = function(pressed)
             if not Library.Flags["Fly_Enabled"] then return end
             FlyEnabled = pressed
@@ -5942,11 +7000,17 @@ do -- Misc Tab
         Mode = "Hold"
     })
 
-    MovementSection:Slider({Name = "Fly Speed", Min = 10, Max = 200, Default = 50, Flag = "Fly_Speed"})
+    MovementSection:Slider({
+        Name = "Fly Speed",
+        Min = 10, Max = 200, Default = 50,
+        Flag = "Fly_Speed"
+    })
 
-    -- Click TP (Bonus!)
+    -- Click TP
     MovementSection:Toggle({
-        Name = "Click TP", Flag = "Click_TP", Default = false,
+        Name = "Click TP",
+        Flag = "Click_TP",
+        Default = false,
         Callback = function(v)
             ClickTPEnabled = v
             if v then EnableClickTP() else DisableClickTP() end
@@ -5955,7 +7019,9 @@ do -- Misc Tab
 
     -- Anti Fling
     MovementSection:Toggle({
-        Name = "Anti Fling", Flag = "Anti_Fling", Default = false,
+        Name = "Anti Fling",
+        Flag = "Anti_Fling",
+        Default = false,
         Callback = function(v)
             AntiFlingEnabled = v
             ToggleAntiFling(v)
@@ -5964,7 +7030,9 @@ do -- Misc Tab
 
     -- Infinite Jump
     MovementSection:Toggle({
-        Name = "Infinite Jump", Flag = "Infinite_Jump", Default = false,
+        Name = "Infinite Jump",
+        Flag = "Infinite_Jump",
+        Default = false,
         Callback = function(v)
             InfiniteJumpEnabled = v
             ToggleInfiniteJump(v)
@@ -5973,7 +7041,9 @@ do -- Misc Tab
 
     -- No Clip
     MovementSection:Toggle({
-        Name = "No Clip", Flag = "No_Clip", Default = false,
+        Name = "No Clip",
+        Flag = "No_Clip",
+        Default = false,
         Callback = function(v)
             NoClipEnabled = v
             ToggleNoClip(v)
@@ -5982,7 +7052,9 @@ do -- Misc Tab
 
     -- Jump Power
     MovementSection:Slider({
-        Name = "Jump Power", Min = 50, Max = 200, Default = 50, Flag = "Jump_Power",
+        Name = "Jump Power",
+        Min = 50, Max = 200, Default = 50,
+        Flag = "Jump_Power",
         Callback = function(v)
             local C = LocalPlayer.Character
             if C then
@@ -5992,13 +7064,34 @@ do -- Misc Tab
         end
     })
 
+    -- NEW: Spinbot
+    MovementSection:Toggle({
+        Name = "Spinbot",
+        Flag = "Spinbot_Enabled",
+        Default = false,
+        Callback = function(v)
+            ToggleSpinbot(v)
+        end
+    }):Keybind({Flag = "Spinbot_Key", Default = Enum.KeyCode.Z})
+
+    MovementSection:Slider({
+        Name = "Spin Speed",
+        Min = 10, Max = 1000, Default = 100,
+        Flag = "Spinbot_Speed",
+        Callback = function(v)
+            SpinSpeed = v
+        end
+    })
+
     --------------------------------------------------------------------
     -- Character Section
     --------------------------------------------------------------------
     local CharacterSection = MiscTab:Section({Name = "Character", Side = 1})
 
     CharacterSection:Toggle({
-        Name = "FOV Changer", Flag = "FOV_Enabled", Default = false,
+        Name = "FOV Changer",
+        Flag = "FOV_Enabled",
+        Default = false,
         Callback = function(v)
             FOVEnabled = v
             SetFOV(v and (Library.Flags["FOV_Amount"] or 70) or OriginalFOV)
@@ -6006,28 +7099,51 @@ do -- Misc Tab
     })
 
     CharacterSection:Slider({
-        Name = "FOV Amount", Min = 70, Max = 120, Default = 90, Suffix = " degrees",
+        Name = "FOV Amount",
+        Min = 70, Max = 120, Default = 90,
+        Suffix = " degrees",
         Flag = "FOV_Amount",
-        Callback = function(v) if FOVEnabled then SetFOV(v) end end
+        Callback = function(v)
+            if FOVEnabled then SetFOV(v) end
+        end
     })
 
     CharacterSection:Button({Name = "Remove Accessories", Callback = function()
         local C = LocalPlayer.Character
-        if C then for _, a in pairs(C:GetChildren()) do if a:IsA("Accessory") then a:Destroy() end end end
+        if C then
+            for _, a in pairs(C:GetChildren()) do
+                if a:IsA("Accessory") then a:Destroy() end
+            end
+        end
     end})
 
     CharacterSection:Button({Name = "Reset Character", Callback = function()
         local C = LocalPlayer.Character
-        if C then local H = C:FindFirstChildOfClass("Humanoid") if H then H.Health = 0 end end
+        if C then
+            local H = C:FindFirstChildOfClass("Humanoid")
+            if H then H.Health = 0 end
+        end
     end})
 
     --------------------------------------------------------------------
-    -- Utility Section (Now Only Anti-AFK)
+    -- Utility Section
     --------------------------------------------------------------------
     local UtilitySection = MiscTab:Section({Name = "Utility", Side = 2})
 
+    -- NEW: Chat Spy
     UtilitySection:Toggle({
-        Name = "Anti AFK", Flag = "Anti_AFK", Default = false,
+        Name = "Chat Spy",
+        Flag = "Chat_Spy",
+        Default = false,
+        Callback = function(v)
+            if v then EnableChatSpy() else DisableChatSpy() end
+        end
+    })
+
+    UtilitySection:Toggle({
+        Name = "Anti AFK",
+        Flag = "Anti_AFK",
+        Default = false,
         Callback = function(v)
             if v then
                 local VU = game:GetService("VirtualUser")
@@ -6053,8 +7169,7 @@ do -- Misc Tab
     GameSection:Button({Name = "Server Hop", Callback = function()
         local TS = game:GetService("TeleportService")
         local HS = game:GetService("HttpService")
-        local data = HS:JSONDecode(game:HttpGet(
-            "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+        local data = HS:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
         if data and data.data then
             for _, srv in pairs(data.data) do
                 if srv.id ~= game.JobId and srv.playing < srv.maxPlayers then
@@ -6077,15 +7192,11 @@ do -- Misc Tab
         end
 
         if SpeedEnabled then task.wait(0.1); EnableSpeed() end
-        if FlyEnabled then
-            task.wait(0.1); DisableFly()
-            task.wait(0.15); EnableFly()
-        end
-        if AntiFlingEnabled then
-            task.wait(0.05); ToggleAntiFling(false); ToggleAntiFling(true)
-        end
+        if FlyEnabled then task.wait(0.1); DisableFly() task.wait(0.15); EnableFly() end
+        if AntiFlingEnabled then task.wait(0.05); ToggleAntiFling(false); ToggleAntiFling(true) end
         if ClickTPEnabled then EnableClickTP() end
         if FOVEnabled then SetFOV(Library.Flags["FOV_Amount"] or 70) end
+        if SpinbotEnabled then ToggleSpinbot(false); ToggleSpinbot(true) end
     end)
 end
 
