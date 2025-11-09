@@ -4963,7 +4963,7 @@ local RageTab = Window:Page({Name = "Rage", Columns = 2, Subtabs = false})
 
 
 
--- MEOW.GG - Void System + Silent Aim Integration
+
 local voidmeow = {
 	enabled = false,
 	spam_enabled = false,
@@ -5003,11 +5003,9 @@ local silentaim = {
 	hitpart = "Head",
 	use_closest_part = false,
 	mouse_hook = nil,
-	-- Auto Shoot
 	auto_shoot = false,
 	auto_shoot_delay = 0.1,
 	last_shot_time = 0,
-	-- Checks
 	checks = {
 		wall_check = true,
 		forcefield_check = true,
@@ -5025,6 +5023,7 @@ local uis = game:GetService("UserInputService")
 local lp = players.LocalPlayer
 local camera = workspace.CurrentCamera
 local mouse = lp:GetMouse()
+local Debris = game:GetService("Debris")
 
 -- Silent Aim Visuals
 local fov_circle = nil
@@ -5181,14 +5180,11 @@ local function createVoidDrawings()
 	voidDrawings.positionDot.NumSides = 32
 	voidDrawings.positionDot.ZIndex = 10
 end
-
 createVoidDrawings()
 
 -- Silent Aim Functions
 local function createFOVCircle()
 	if fov_circle then return end
-	
-	-- Fill circle
 	fov_fill = Drawing.new("Circle")
 	fov_fill.Radius = silentaim.fov
 	fov_fill.Color = silentaim.fov_fill_color
@@ -5197,8 +5193,6 @@ local function createFOVCircle()
 	fov_fill.Filled = true
 	fov_fill.Transparency = silentaim.fov_fill_transparency
 	fov_fill.ZIndex = 997
-	
-	-- Outline
 	fov_outline = Drawing.new("Circle")
 	fov_outline.Radius = silentaim.fov
 	fov_outline.Color = Color3.fromRGB(0, 0, 0)
@@ -5207,8 +5201,6 @@ local function createFOVCircle()
 	fov_outline.Filled = false
 	fov_outline.Transparency = 1
 	fov_outline.ZIndex = 998
-	
-	-- Main circle
 	fov_circle = Drawing.new("Circle")
 	fov_circle.Radius = silentaim.fov
 	fov_circle.Color = silentaim.fov_color
@@ -5220,31 +5212,18 @@ local function createFOVCircle()
 end
 
 local function removeFOVCircle()
-	if fov_circle then
-		fov_circle:Remove()
-		fov_circle = nil
-	end
-	if fov_fill then
-		fov_fill:Remove()
-		fov_fill = nil
-	end
-	if fov_outline then
-		fov_outline:Remove()
-		fov_outline = nil
-	end
+	if fov_circle then fov_circle:Remove() fov_circle = nil end
+	if fov_fill then fov_fill:Remove() fov_fill = nil end
+	if fov_outline then fov_outline:Remove() fov_outline = nil end
 end
 
 local function createTracer()
 	if tracer_line then return end
-	
-	-- Outline
 	tracer_outline = Drawing.new("Line")
 	tracer_outline.Color = Color3.fromRGB(0, 0, 0)
 	tracer_outline.Thickness = silentaim.tracer_thickness + 2
 	tracer_outline.Transparency = 1
 	tracer_outline.ZIndex = 996
-	
-	-- Main line
 	tracer_line = Drawing.new("Line")
 	tracer_line.Color = silentaim.tracer_color
 	tracer_line.Thickness = silentaim.tracer_thickness
@@ -5253,133 +5232,76 @@ local function createTracer()
 end
 
 local function removeTracer()
-	if tracer_line then
-		tracer_line:Remove()
-		tracer_line = nil
-	end
-	if tracer_outline then
-		tracer_outline:Remove()
-		tracer_outline = nil
-	end
+	if tracer_line then tracer_line:Remove() tracer_line = nil end
+	if tracer_outline then tracer_outline:Remove() tracer_outline = nil end
 end
 
--- Fixed: Get all valid parts for a character
 local function getAllValidParts(character)
 	local validParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso"}
 	local parts = {}
-	
 	for _, partName in ipairs(validParts) do
 		local part = character:FindFirstChild(partName)
-		if part then
-			table.insert(parts, part)
-		end
+		if part then table.insert(parts, part) end
 	end
-	
 	return parts
 end
 
--- Check if player is valid target
 local function isValidTarget(player)
 	if not player or player == lp then return false end
-	
 	local character = player.Character
 	if not character then return false end
-	
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return false end
-	
-	-- Dead check
-	if silentaim.checks.dead_check and humanoid.Health <= 0 then
-		return false
-	end
-	
-	-- Knocked check (common in games like Da Hood)
+	if silentaim.checks.dead_check and humanoid.Health <= 0 then return false end
 	if silentaim.checks.knocked_check then
-		-- Check for knocked state (various methods)
 		local bodyEffects = character:FindFirstChild("BodyEffects")
 		if bodyEffects then
 			local ko = bodyEffects:FindFirstChild("K.O")
-			if ko and ko.Value == true then
-				return false
-			end
+			if ko and ko.Value == true then return false end
 		end
-		
-		-- Alternative knocked check
-		if humanoid:FindFirstChild("creator") then
-			return false
-		end
-		
-		-- Check PlatformStand (knocked down state)
-		if humanoid.PlatformStand then
-			return false
-		end
+		if humanoid:FindFirstChild("creator") then return false end
+		if humanoid.PlatformStand then return false end
 	end
-	
-	-- Forcefield check
-	if silentaim.checks.forcefield_check then
-		if character:FindFirstChildOfClass("ForceField") then
-			return false
-		end
-	end
-	
-	-- Team check
-	if silentaim.checks.team_check then
-		if player.Team == lp.Team and player.Team ~= nil then
-			return false
-		end
-	end
-	
+	if silentaim.checks.forcefield_check and character:FindFirstChildOfClass("ForceField") then return false end
+	if silentaim.checks.team_check and player.Team == lp.Team and player.Team ~= nil then return false end
 	return true
 end
 
--- Wall check function
 local function isVisible(targetPart)
 	if not silentaim.checks.wall_check then return true end
 	if not targetPart then return false end
-	
 	local character = lp.Character
 	if not character then return false end
-	
 	local origin = camera.CFrame.Position
 	local direction = (targetPart.Position - origin).Unit * (targetPart.Position - origin).Magnitude
-	
 	local raycastParams = RaycastParams.new()
 	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 	raycastParams.FilterDescendantsInstances = {character, targetPart.Parent}
 	raycastParams.IgnoreWater = true
-	
 	local result = workspace:Raycast(origin, direction, raycastParams)
-	
 	return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
 end
 
--- Check if target is visible on screen
 local function isOnScreen(part)
 	if not silentaim.checks.visible_check then return true end
 	if not part then return false end
-	
 	local _, onScreen = camera:WorldToViewportPoint(part.Position)
 	return onScreen
 end
 
--- Fixed: Get closest player in FOV
 local function getClosestPlayerInFOV()
 	local closest_player = nil
 	local closest_distance = math.huge
 	local mouse_pos = uis:GetMouseLocation()
-	
 	for _, player in ipairs(players:GetPlayers()) do
 		if isValidTarget(player) then
 			local char = player.Character
 			local parts = getAllValidParts(char)
-			
 			for _, part in ipairs(parts) do
 				if isOnScreen(part) and isVisible(part) then
 					local screen_pos, on_screen = camera:WorldToViewportPoint(part.Position)
-					
 					if on_screen then
 						local distance = (Vector2.new(screen_pos.X, screen_pos.Y) - mouse_pos).Magnitude
-						
 						if distance < silentaim.fov and distance < closest_distance then
 							closest_distance = distance
 							closest_player = player
@@ -5389,21 +5311,16 @@ local function getClosestPlayerInFOV()
 			end
 		end
 	end
-	
 	return closest_player
 end
 
--- Fixed: Get the best part to aim at
 local function getAimPart(character)
 	if not character then return nil end
-	
-	-- If use_closest_part is enabled, find the part closest to mouse
 	if silentaim.use_closest_part then
 		local closest_part = nil
 		local closest_distance = math.huge
 		local mouse_pos = uis:GetMouseLocation()
 		local parts = getAllValidParts(character)
-		
 		for _, part in ipairs(parts) do
 			if isOnScreen(part) and isVisible(part) then
 				local screen_pos, on_screen = camera:WorldToViewportPoint(part.Position)
@@ -5416,43 +5333,32 @@ local function getAimPart(character)
 				end
 			end
 		end
-		
 		return closest_part
 	else
-		-- Use the selected hitpart
 		local part = character:FindFirstChild(silentaim.hitpart)
-		if part and isVisible(part) then
-			return part
-		end
-		
-		-- Fallback to HumanoidRootPart
+		if part and isVisible(part) then return part end
 		local hrp = character:FindFirstChild("HumanoidRootPart")
-		if hrp and isVisible(hrp) then
-			return hrp
-		end
+		if hrp and isVisible(hrp) then return hrp end
 	end
-	
 	return nil
 end
 
--- Auto Shoot Function
 local function autoShoot()
 	if not silentaim.auto_shoot or not silentaim.enabled then return end
-	
 	local current_time = tick()
-	if current_time - silentaim.last_shot_time < silentaim.auto_shoot_delay then
-		return
-	end
-	
+	if current_time - silentaim.last_shot_time < silentaim.auto_shoot_delay then return end
 	local target = getClosestPlayerInFOV()
 	if not target or not target.Character then return end
-	
 	local target_part = getAimPart(target.Character)
 	if not target_part then return end
-	
-	-- Trigger mouse click
+	local character = lp.Character
+	if not character then return end
+	local tool = character:FindFirstChildOfClass("Tool")
+	if not tool then return end
+	pcall(function()
+		tool:Activate()
+	end)
 	silentaim.last_shot_time = current_time
-	mouse1click()
 end
 
 local function updateFOVPosition()
@@ -5462,9 +5368,7 @@ local function updateFOVPosition()
 		if fov_outline then fov_outline.Visible = false end
 		return
 	end
-	
 	local mouse_pos = uis:GetMouseLocation()
-	
 	if fov_fill and silentaim.show_fov_fill then
 		fov_fill.Position = mouse_pos
 		fov_fill.Radius = silentaim.fov
@@ -5472,14 +5376,12 @@ local function updateFOVPosition()
 	elseif fov_fill then
 		fov_fill.Visible = false
 	end
-	
 	if fov_outline then
 		fov_outline.Position = mouse_pos
 		fov_outline.Radius = silentaim.fov
 		fov_outline.Thickness = silentaim.fov_thickness + 1
 		fov_outline.Visible = true
 	end
-	
 	if fov_circle then
 		fov_circle.Position = mouse_pos
 		fov_circle.Radius = silentaim.fov
@@ -5494,34 +5396,28 @@ local function updateTracer()
 		if tracer_outline then tracer_outline.Visible = false end
 		return
 	end
-	
 	local target = getClosestPlayerInFOV()
-	
 	if not target or not target.Character then
 		if tracer_line then tracer_line.Visible = false end
 		if tracer_outline then tracer_outline.Visible = false end
 		return
 	end
-	
 	local target_part = getAimPart(target.Character)
 	if not target_part then
 		if tracer_line then tracer_line.Visible = false end
 		if tracer_outline then tracer_outline.Visible = false end
 		return
 	end
-	
 	local screen_pos, on_screen = camera:WorldToViewportPoint(target_part.Position)
 	if on_screen then
 		local mouse_pos = uis:GetMouseLocation()
 		local target_pos = Vector2.new(screen_pos.X, screen_pos.Y)
-		
 		if tracer_outline then
 			tracer_outline.From = mouse_pos
 			tracer_outline.To = target_pos
 			tracer_outline.Thickness = silentaim.tracer_thickness + 2
 			tracer_outline.Visible = true
 		end
-		
 		if tracer_line then
 			tracer_line.From = mouse_pos
 			tracer_line.To = target_pos
@@ -5534,31 +5430,22 @@ local function updateTracer()
 	end
 end
 
--- Setup Silent Aim Hook
 local function setupSilentAimHook()
 	if silentaim.mouse_hook then return end
-	
 	silentaim.mouse_hook = hookmetamethod(game, "__index", function(self, index)
 		local original = silentaim.mouse_hook(self, index)
-		
 		if silentaim.enabled and self == mouse and index:lower() == "hit" then
 			local target = silentaim.target_player or getClosestPlayerInFOV()
-			
 			if target and target.Character then
 				local target_part = getAimPart(target.Character)
-				if target_part then
-					return CFrame.new(target_part.Position)
-				end
+				if target_part then return CFrame.new(target_part.Position) end
 			end
 		end
-		
 		return original
 	end)
 end
-
 setupSilentAimHook()
 
--- Update Menu Position
 local function updateVoidMenuPosition()
 	local viewportSize = camera.ViewportSize
 	local menuX = (viewportSize.X / 2) - 160
@@ -5582,17 +5469,13 @@ local function updateVoidMenuPosition()
 	voidDrawings.distanceText.Position = Vector2.new(menuX + 60, menuY + 112)
 end
 
--- Update Client Root
 local function updateClientRoot()
 	local character = lp.Character
-	if character then
-		voidmeow.client_root = character:FindFirstChild("HumanoidRootPart")
-	end
+	if character then voidmeow.client_root = character:FindFirstChild("HumanoidRootPart") end
 end
 lp.CharacterAdded:Connect(updateClientRoot)
 updateClientRoot()
 
--- PERMANENT HOOK
 local function enable_void_hook()
 	if voidmeow.hook then return end
 	voidmeow.hook = hookmetamethod(game, "__index", function(self, index)
@@ -5603,7 +5486,6 @@ local function enable_void_hook()
 	end)
 end
 
--- Void Teleport
 local function enhancedVoidTeleport()
 	local basePos = voidmeow.client_root.Position
 	local voidPos = Vector3.new(
@@ -5616,7 +5498,6 @@ local function enhancedVoidTeleport()
 	voidmeow.client_root.CFrame = void_cframe
 end
 
--- Visibility Helper
 local function setVoidMenuVisible(visible)
 	for _, drawing in pairs(voidDrawings) do
 		if drawing ~= voidDrawings.positionDot and drawing ~= voidDrawings.positionDotOutline and drawing ~= voidDrawings.positionGlow then
@@ -5625,7 +5506,6 @@ local function setVoidMenuVisible(visible)
 	end
 end
 
--- Update Void Label
 local function updateVoidLabel()
 	if voidmeow.enabled then
 		local pos = voidmeow.current_void_pos
@@ -5679,7 +5559,6 @@ local function updateVoidLabel()
 	end
 end
 
--- Update Position Indicator
 local function updateVoidPositionIndicator()
 	if not voidmeow.show_indicator then
 		voidDrawings.positionDot.Visible = false
@@ -5687,7 +5566,6 @@ local function updateVoidPositionIndicator()
 		voidDrawings.positionGlow.Visible = false
 		return
 	end
-
 	local targetPosition
 	local character = lp.Character
 	if voidmeow.enabled then
@@ -5710,7 +5588,6 @@ local function updateVoidPositionIndicator()
 		voidDrawings.positionGlow.Visible = false
 		return
 	end
-
 	local vector, onScreen = camera:WorldToViewportPoint(targetPosition)
 	if onScreen then
 		local screenPos = Vector2.new(vector.X, vector.Y)
@@ -5720,7 +5597,6 @@ local function updateVoidPositionIndicator()
 		voidDrawings.positionGlow.Visible = true
 		voidDrawings.positionDotOutline.Visible = true
 		voidDrawings.positionDot.Visible = true
-
 		local pulse = math.abs(math.sin(tick() * 3))
 		voidDrawings.positionGlow.Transparency = 0.1 + (pulse * 0.3)
 		local glowPulse = math.abs(math.sin(tick() * 2))
@@ -5735,14 +5611,11 @@ end
 -- === MAIN LOOP ===
 run_service.Heartbeat:Connect(function(delta)
 	if not voidmeow.client_root then return end
-
 	local is_active = voidmeow.enabled or voidmeow.spam_enabled
 	voidmeow.enabled = voidmeow.selected_mode == "Permanent Void" and is_active
 	voidmeow.spam_enabled = voidmeow.selected_mode == "Void Spam" and is_active
-
 	if voidmeow.enabled or voidmeow.spam_enabled then
 		enable_void_hook()
-
 		if voidmeow.spam_enabled then
 			voidmeow.timer = voidmeow.timer + delta
 			local threshold = voidmeow.is_in_void and voidmeow.void_time or voidmeow.normal_time
@@ -5750,7 +5623,6 @@ run_service.Heartbeat:Connect(function(delta)
 				voidmeow.timer = 0
 				voidmeow.is_in_void = not voidmeow.is_in_void
 			end
-
 			voidmeow.saved_cframe = voidmeow.client_root.CFrame
 			if voidmeow.is_in_void then
 				for i = 1, voidmeow.teleport_speed do
@@ -5769,7 +5641,6 @@ run_service.Heartbeat:Connect(function(delta)
 			run_service.RenderStepped:Wait()
 			voidmeow.client_root.CFrame = voidmeow.saved_cframe
 		end
-
 		updateVoidLabel()
 		updateVoidPositionIndicator()
 	else
@@ -5783,7 +5654,6 @@ run_service.Heartbeat:Connect(function(delta)
 	end
 end)
 
--- Silent Aim Visual Update Loop
 run_service.RenderStepped:Connect(function()
 	if silentaim.enabled then
 		updateFOVPosition()
@@ -5792,15 +5662,231 @@ run_service.RenderStepped:Connect(function()
 	end
 end)
 
--- === UI ===
-if RageTab then
-	-- === SILENT AIM SECTION ===
-	local SilentAimSection = RageTab:Section({Name = "Silent Aim", Side = 2})
 
-	-- Enable Toggle
+if RageTab then
+	-- Hit-sound table
+	getgenv().hitsounds = {
+		["Bubble"] = "rbxassetid://6534947588",
+		["Lazer"] = "rbxassetid://130791043",
+		["Pick"] = "rbxassetid://1347140027",
+		["Pop"] = "rbxassetid://198598793",
+		["Rust"] = "rbxassetid://1255040462",
+		["Sans"] = "rbxassetid://3188795283",
+		["Fart"] = "rbxassetid://130833677",
+		["Big"] = "rbxassetid://5332005053",
+		["Vine"] = "rbxassetid://5332680810",
+		["UwU"] = "rbxassetid://8679659744",
+		["Bruh"] = "rbxassetid://4578740568",
+		["Skeet"] = "rbxassetid://5633695679",
+		["Neverlose"] = "rbxassetid://6534948092",
+		["Fatality"] = "rbxassetid://6534947869",
+		["Bonk"] = "rbxassetid://5766898159",
+		["Minecraft"] = "rbxassetid://5869422451",
+		["Gamesense"] = "rbxassetid://4817809188",
+		["RIFK7"] = "rbxassetid://9102080552",
+		["Bamboo"] = "rbxassetid://3769434519",
+		["Crowbar"] = "rbxassetid://546410481",
+		["Weeb"] = "rbxassetid://6442965016",
+		["Beep"] = "rbxassetid://8177256015",
+		["Bambi"] = "rbxassetid://8437203821",
+		["Stone"] = "rbxassetid://3581383408",
+		["Old Fatality"] = "rbxassetid://6607142036",
+		["Click"] = "rbxassetid://8053704437",
+		["Ding"] = "rbxassetid://7149516994",
+		["Snow"] = "rbxassetid://6455527632",
+		["Laser"] = "rbxassetid://7837461331",
+		["Mario"] = "rbxassetid://2815207981",
+		["Steve"] = "rbxassetid://4965083997",
+		["Call of Duty"] = "rbxassetid://5952120301",
+		["Bat"] = "rbxassetid://3333907347",
+		["TF2 Critical"] = "rbxassetid://296102734",
+		["Saber"] = "rbxassetid://8415678813",
+		["Baimware"] = "rbxassetid://3124331820",
+		["Osu"] = "rbxassetid://7149255551",
+		["TF2"] = "rbxassetid://2868331684",
+		["Slime"] = "rbxassetid://6916371803",
+		["Among Us"] = "rbxassetid://5700183626",
+		["One"] = "rbxassetid://7380502345"
+	}
+
+	-- Config
+	local hitsound_cfg = {
+		enabled = true,
+		sound = true,
+		notif = true,
+		volume = 0.6,
+		pitch = 1,
+		selected = "Skeet",
+		duration = 0.5,
+		notif_color = Color3.fromRGB(255, 50, 50),
+		last_hit_time = 0,
+		last_hit_player = nil,
+		last_damage = {},
+		pending_notif = false
+	}
+
+	-- Get current target
+	local function getTarget()
+		return getClosestPlayerInFOV()
+	end
+
+
+	local function playHitSound()
+		if not hitsound_cfg.sound then return end
+		local now = tick()
+		if now - hitsound_cfg.last_hit_time < 0.15 then return end
+
+		local id = getgenv().hitsounds[hitsound_cfg.selected]
+		if not id then return end
+
+		local s = Instance.new("Sound")
+		s.SoundId = id
+		s.Volume = hitsound_cfg.volume
+		s.PlaybackSpeed = hitsound_cfg.pitch
+		s.Parent = workspace
+		s:Play()
+		Debris:AddItem(s, 5)
+
+		hitsound_cfg.last_hit_time = now
+	end
+
+
+	local function sendHitNotif(targetName, dmg, toolName, part)
+		if not hitsound_cfg.notif then return end
+		if hitsound_cfg.pending_notif then return end
+		hitsound_cfg.pending_notif = true
+
+		local txt = string.format("MEOW.GG | %s | %d | %s | %s", targetName, dmg, toolName or "Fists", part or "Body")
+		local icon = {"rbxassetid://0", Color3.fromRGB(255, 255, 255)}
+
+		pcall(function()
+			local id = getgenv().hitsounds[hitsound_cfg.selected]:match("%d+")
+			if id then
+				icon = {id, Color3.fromRGB(255, 100, 100)}
+			end
+		end)
+
+		pcall(function()
+			Library:Notification(txt, hitsound_cfg.duration, hitsound_cfg.notif_color, icon)
+		end)
+
+		hitsound_cfg.pending_notif = false
+	end
+
+	-- Damage detection
+	local hitConn
+	local function startHitMonitor()
+		if hitConn then hitConn:Disconnect() end
+		if not hitsound_cfg.enabled then return end
+
+		hitConn = run_service.Heartbeat:Connect(function()
+			if not hitsound_cfg.enabled then return end
+			local target = getTarget()
+			if not target or not target.Character then return end
+
+			local hum = target.Character:FindFirstChildOfClass("Humanoid")
+			if not hum then return end
+
+			local cur = hum.Health
+			local prev = hitsound_cfg.last_damage[target] or cur
+
+			if cur < prev and (prev - cur) > 1 then
+				local dmg = math.floor(prev - cur)
+				local now = tick()
+
+				if target ~= hitsound_cfg.last_hit_player or (now - hitsound_cfg.last_hit_time > 0.15) then
+					local tool = lp.Character and lp.Character:FindFirstChildOfClass("Tool")
+					playHitSound()
+					sendHitNotif(target.Name, dmg, tool and tool.Name, "Body")
+					hitsound_cfg.last_hit_player = target
+					hitsound_cfg.last_hit_time = now
+				end
+			end
+
+			hitsound_cfg.last_damage[target] = cur
+		end)
+	end
+
+	-- UI
+	local HitSec = RageTab:Section({Name = "Hit Effects", Side = 2})
+
+	HitSec:Toggle({
+		Name = "Master Enable",
+		Flag = "Hit_Master",
+		Default = true,
+		Callback = function(v)
+			hitsound_cfg.enabled = v
+			if v then startHitMonitor() end
+		end
+	})
+
+	HitSec:Toggle({
+		Name = "Hit Sound",
+		Flag = "Hit_Sound",
+		Default = true,
+		Callback = function(v) hitsound_cfg.sound = v end
+	})
+
+	HitSec:Dropdown({
+		Name = "Sound",
+		Flag = "Hit_SoundChoice",
+		Default = hitsound_cfg.selected,
+		Items = (function()
+			local t = {}
+			for k,_ in pairs(getgenv().hitsounds) do table.insert(t,k) end
+			table.sort(t)
+			return t
+		end)(),
+		Callback = function(v) hitsound_cfg.selected = v end
+	})
+
+	HitSec:Slider({
+		Name = "Volume",
+		Min = 0, Max = 5, Default = hitsound_cfg.volume, Decimals = 0.05,
+		Flag = "Hit_Volume",
+		Callback = function(v) hitsound_cfg.volume = v end
+	})
+
+	HitSec:Slider({
+		Name = "Pitch",
+		Min = 0.5, Max = 2, Default = hitsound_cfg.pitch, Decimals = 0.05,
+		Flag = "Hit_Pitch",
+		Callback = function(v) hitsound_cfg.pitch = v end
+	})
+
+
+	HitSec:Toggle({
+		Name = "Hit Notification",
+		Flag = "Hit_Notif",
+		Default = true,
+		Callback = function(v) hitsound_cfg.notif = v end
+	}):Colorpicker({
+		Name = "Notif Color",
+		Flag = "Hit_Color",
+		Default = hitsound_cfg.notif_color,
+		Callback = function(color)
+			hitsound_cfg.notif_color = color
+		end
+	})
+
+	HitSec:Slider({
+		Name = "Notif Duration",
+		Min = 0.1, Max = 5, Default = hitsound_cfg.duration, Decimals = 0.1,
+		Flag = "Hit_Duration",
+		Callback = function(v) hitsound_cfg.duration = v end
+	})
+
+	-- Start
+	startHitMonitor()
+	print("MEOW.GG: Hit effects loaded – COLORPICKER FIXED!")
+end
+
+
+if RageTab then
+	-- Silent Aim UI
+	local SilentAimSection = RageTab:Section({Name = "Silent Aim", Side = 2})
 	local function setSilentAimActive(active)
 		silentaim.enabled = active
-		
 		if active then
 			createFOVCircle()
 			createTracer()
@@ -5810,354 +5896,46 @@ if RageTab then
 			silentaim.target_player = nil
 		end
 	end
+	SilentAimSection:Toggle({Name = "Enabled", Flag = "SilentAim_Enabled", Default = false, Callback = setSilentAimActive})
+	SilentAimSection:Slider({Name = "FOV Size", Min = 50, Max = 1000, Default = 350, Decimals = 1, Flag = "SilentAim_FOV", Callback = function(v) silentaim.fov = v end})
+	SilentAimSection:Dropdown({Name = "Hit Part", Flag = "SilentAim_HitPart", Default = "Head", Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}, Callback = function(v) silentaim.hitpart = v end})
+	SilentAimSection:Toggle({Name = "Use Closest Part", Flag = "SilentAim_ClosestPart", Default = false, Callback = function(v) silentaim.use_closest_part = v end})
+	SilentAimSection:Toggle({Name = "Show FOV Circle", Flag = "SilentAim_ShowFOV", Default = true, Callback = function(v) silentaim.show_fov = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_color = c; if fov_circle then fov_circle.Color = c end end})
+	SilentAimSection:Slider({Name = "FOV Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_FOVThickness", Callback = function(v) silentaim.fov_thickness = v; if fov_circle then fov_circle.Thickness = v end; if fov_outline then fov_outline.Thickness = v + 1 end end})
+	SilentAimSection:Toggle({Name = "FOV Fill", Flag = "SilentAim_FOVFill", Default = true, Callback = function(v) silentaim.show_fov_fill = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVFillColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_fill_color = c; if fov_fill then fov_fill.Color = c end end})
+	SilentAimSection:Slider({Name = "Fill Transparency", Min = 0, Max = 1, Default = 0.9, Decimals = 0.01, Flag = "SilentAim_FillTransparency", Callback = function(v) silentaim.fov_fill_transparency = v; if fov_fill then fov_fill.Transparency = v end end})
+	SilentAimSection:Toggle({Name = "Show Tracer", Flag = "SilentAim_ShowTracer", Default = true, Callback = function(v) silentaim.show_tracer = v end}):Colorpicker({Name = "ColorColor", Flag = "SilentAim_TracerColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.tracer_color = c; if tracer_line then tracer_line.Color = c end end})
+	SilentAimSection:Slider({Name = "Tracer Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_TracerThickness", Callback = function(v) silentaim.tracer_thickness = v; if tracer_line then tracer_line.Thickness = v end; if tracer_outline then tracer_outline.Thickness = v + 2 end end})
+	SilentAimSection:Toggle({Name = "Auto Shoot", Flag = "SilentAim_AutoShoot", Default = false, Callback = function(v) silentaim.auto_shoot = v end})
+	SilentAimSection:Slider({Name = "Shoot Delay", Min = 0.01, Max = 1, Default = 0.1, Decimals = 0.01, Flag = "SilentAim_ShootDelay", Callback = function(v) silentaim.auto_shoot_delay = v end})
 
-	SilentAimSection:Toggle({
-		Name = "Enabled",
-		Flag = "SilentAim_Enabled",
-		Default = false,
-		Callback = setSilentAimActive
-	})
-
-	-- FOV Size
-	SilentAimSection:Slider({
-		Name = "FOV Size",
-		Min = 50,
-		Max = 1000,
-		Default = 350,
-		Decimals = 1,
-		Flag = "SilentAim_FOV",
-		Callback = function(v)
-			silentaim.fov = v
-		end
-	})
-
-	-- Hit Part (Single Selection)
-	SilentAimSection:Dropdown({
-		Name = "Hit Part",
-		Flag = "SilentAim_HitPart",
-		Default = "Head",
-		Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
-		Callback = function(value)
-			silentaim.hitpart = value
-		end
-	})
-
-	SilentAimSection:Toggle({
-		Name = "Use Closest Part",
-		Flag = "SilentAim_ClosestPart",
-		Default = false,
-		Callback = function(v)
-			silentaim.use_closest_part = v
-		end
-	})
-
-	-- FOV Visuals
-	SilentAimSection:Toggle({
-		Name = "Show FOV Circle",
-		Flag = "SilentAim_ShowFOV",
-		Default = true,
-		Callback = function(v)
-			silentaim.show_fov = v
-		end
-	}):Colorpicker({
-		Name = "Color",
-		Flag = "SilentAim_FOVColor",
-		Default = Color3.fromRGB(100, 82, 88),
-		Callback = function(color)
-			silentaim.fov_color = color
-			if fov_circle then
-				fov_circle.Color = color
-			end
-		end
-	})
-
-	SilentAimSection:Slider({
-		Name = "FOV Thickness",
-		Min = 1,
-		Max = 10,
-		Default = 2,
-		Decimals = 1,
-		Flag = "SilentAim_FOVThickness",
-		Callback = function(v)
-			silentaim.fov_thickness = v
-			if fov_circle then
-				fov_circle.Thickness = v
-			end
-			if fov_outline then
-				fov_outline.Thickness = v + 1
-			end
-		end
-	})
-
-	SilentAimSection:Toggle({
-		Name = "FOV Fill",
-		Flag = "SilentAim_FOVFill",
-		Default = true,
-		Callback = function(v)
-			silentaim.show_fov_fill = v
-		end
-	}):Colorpicker({
-		Name = "Color",
-		Flag = "SilentAim_FOVFillColor",
-		Default = Color3.fromRGB(100, 82, 88),
-		Callback = function(color)
-			silentaim.fov_fill_color = color
-			if fov_fill then
-				fov_fill.Color = color
-			end
-		end
-	})
-
-	SilentAimSection:Slider({
-		Name = "Fill Transparency",
-		Min = 0,
-		Max = 1,
-		Default = 0.9,
-		Decimals = 0.01,
-		Flag = "SilentAim_FillTransparency",
-		Callback = function(v)
-			silentaim.fov_fill_transparency = v
-			if fov_fill then
-				fov_fill.Transparency = v
-			end
-		end
-	})
-
-	-- Tracer Visuals
-	SilentAimSection:Toggle({
-		Name = "Show Tracer",
-		Flag = "SilentAim_ShowTracer",
-		Default = true,
-		Callback = function(v)
-			silentaim.show_tracer = v
-		end
-	}):Colorpicker({
-		Name = "Color",
-		Flag = "SilentAim_TracerColor",
-		Default = Color3.fromRGB(100, 82, 88),
-		Callback = function(color)
-			silentaim.tracer_color = color
-			if tracer_line then
-				tracer_line.Color = color
-			end
-		end
-	})
-
-	SilentAimSection:Slider({
-		Name = "Tracer Thickness",
-		Min = 1,
-		Max = 10,
-		Default = 2,
-		Decimals = 1,
-		Flag = "SilentAim_TracerThickness",
-		Callback = function(v)
-			silentaim.tracer_thickness = v
-			if tracer_line then
-				tracer_line.Thickness = v
-			end
-			if tracer_outline then
-				tracer_outline.Thickness = v + 2
-			end
-		end
-	})
-
-	-- Auto Shoot
-	SilentAimSection:Toggle({
-		Name = "Auto Shoot",
-		Flag = "SilentAim_AutoShoot",
-		Default = false,
-		Callback = function(v)
-			silentaim.auto_shoot = v
-		end
-	})
-
-	SilentAimSection:Slider({
-		Name = "Shoot Delay",
-		Min = 0.01,
-		Max = 1,
-		Default = 0.1,
-		Decimals = 0.01,
-		Flag = "SilentAim_ShootDelay",
-		Callback = function(v)
-			silentaim.auto_shoot_delay = v
-		end
-	})
-
-	-- Checks Section
 	local ChecksSection = RageTab:Section({Name = "Silent Aim Checks", Side = 2})
+	ChecksSection:Toggle({Name = "Wall Check", Flag = "SilentAim_WallCheck", Default = true, Callback = function(v) silentaim.checks.wall_check = v end})
+	ChecksSection:Toggle({Name = "Visible Check", Flag = "SilentAim_VisibleCheck", Default = true, Callback = function(v) silentaim.checks.visible_check = v end})
+	ChecksSection:Toggle({Name = "Forcefield Check", Flag = "SilentAim_ForcefieldCheck", Default = true, Callback = function(v) silentaim.checks.forcefield_check = v end})
+	ChecksSection:Toggle({Name = "Knocked Check", Flag = "SilentAim_KnockedCheck", Default = true, Callback = function(v) silentaim.checks.knocked_check = v end})
+	ChecksSection:Toggle({Name = "Dead Check", Flag = "SilentAim_DeadCheck", Default = true, Callback = function(v) silentaim.checks.dead_check = v end})
+	ChecksSection:Toggle({Name = "Team Check", Flag = "SilentAim_TeamCheck", Default = false, Callback = function(v) silentaim.checks.team_check = v end})
 
-	ChecksSection:Toggle({
-		Name = "Wall Check",
-		Flag = "SilentAim_WallCheck",
-		Default = true,
-		Callback = function(v)
-			silentaim.checks.wall_check = v
-		end
-	})
-
-	ChecksSection:Toggle({
-		Name = "Visible Check",
-		Flag = "SilentAim_VisibleCheck",
-		Default = true,
-		Callback = function(v)
-			silentaim.checks.visible_check = v
-		end
-	})
-
-	ChecksSection:Toggle({
-		Name = "Forcefield Check",
-		Flag = "SilentAim_ForcefieldCheck",
-		Default = true,
-		Callback = function(v)
-			silentaim.checks.forcefield_check = v
-		end
-	})
-
-	ChecksSection:Toggle({
-		Name = "Knocked Check",
-		Flag = "SilentAim_KnockedCheck",
-		Default = true,
-		Callback = function(v)
-			silentaim.checks.knocked_check = v
-		end
-	})
-
-	ChecksSection:Toggle({
-		Name = "Dead Check",
-		Flag = "SilentAim_DeadCheck",
-		Default = true,
-		Callback = function(v)
-			silentaim.checks.dead_check = v
-		end
-	})
-
-	ChecksSection:Toggle({
-		Name = "Team Check",
-		Flag = "SilentAim_TeamCheck",
-		Default = false,
-		Callback = function(v)
-			silentaim.checks.team_check = v
-		end
-	})
-
-	-- === VOID SECTION ===
+	-- Void UI
 	local VoidSection = RageTab:Section({Name = "Anti Aim"})
-
-	VoidSection:Dropdown({
-		Name = "Void Mode",
-		Flag = "Void_Mode",
-		Default = "Off",
-		Items = {"Off", "Permanent Void", "Void Spam"},
-		Callback = function(value)
-			voidmeow.selected_mode = value
-			if value == "Off" then
-				voidmeow.enabled = false
-				voidmeow.spam_enabled = false
-			end
-		end
-	})
-
+	VoidSection:Dropdown({Name = "Void Mode", Flag = "Void_Mode", Default = "Off", Items = {"Off", "Permanent Void", "Void Spam"}, Callback = function(v) voidmeow.selected_mode = v; if v == "Off" then voidmeow.enabled = false; voidmeow.spam_enabled = false end end})
 	local function setVoidActive(active)
-		if voidmeow.selected_mode == "Off" then
-			voidmeow.enabled = false
-			voidmeow.spam_enabled = false
-		else
-			voidmeow.enabled = active and (voidmeow.selected_mode == "Permanent Void")
-			voidmeow.spam_enabled = active and (voidmeow.selected_mode == "Void Spam")
-		end
+		if voidmeow.selected_mode == "Off" then voidmeow.enabled = false; voidmeow.spam_enabled = false
+		else voidmeow.enabled = active and (voidmeow.selected_mode == "Permanent Void"); voidmeow.spam_enabled = active and (voidmeow.selected_mode == "Void Spam") end
 	end
+	VoidSection:Toggle({Name = "Enabled", Flag = "Void_Enabled", Default = false, Callback = setVoidActive}):Keybind({Name = "Hotkey", Flag = "Void_Hotkey", Default = Enum.KeyCode.V, Mode = "Toggle", Callback = setVoidActive})
+	VoidSection:Slider({Name = "TP Speed", Min = 1, Max = 10, Default = 3, Decimals = 1, Flag = "Void_TeleportSpeed", Callback = function(v(v) voidmeow.teleport_speed = math.floor(v) end})
+	VoidSection:Slider({Name = "Void Height", Min = -1000, Max = -100, Default = -400, Decimals = 1, Flag = "Void_Height", Callback = function(v) voidmeow.void_height_min = v; voidmeow.void_height_max = v + 200 end})
+	VoidSection:Slider({Name = "Void Range", Min = 50, Max = 10000, Default = 5000, Decimals = 1, Flag = "Void_Range", Callback = function(v) voidmeow.void_range = v end})
+	VoidSection:Toggle({Name = "Show Indicator", Flag = "Void_ShowIndicator", Default = true, Callback = function(v) voidmeow.show_indicator = v end})
 
-	VoidSection:Toggle({
-		Name = "Enabled",
-		Flag = "Void_Enabled",
-		Default = false,
-		Callback = setVoidActive
-	}):Keybind({
-		Name = "Hotkey",
-		Flag = "Void_Hotkey",
-		Default = Enum.KeyCode.V,
-		Mode = "Toggle",
-		Callback = function(value)
-			setVoidActive(value)
-		end
-	})
-
-	VoidSection:Slider({
-		Name = "TP Speed",
-		Min = 1,
-		Max = 10,
-		Default = 3,
-		Decimals = 1,
-		Flag = "Void_TeleportSpeed",
-		Callback = function(v)
-			voidmeow.teleport_speed = math.floor(v)
-		end
-	})
-
-	VoidSection:Slider({
-		Name = "Void Height",
-		Min = -1000,
-		Max = -100,
-		Default = -400,
-		Decimals = 1,
-		Flag = "Void_Height",
-		Callback = function(v)
-			voidmeow.void_height_min = v
-			voidmeow.void_height_max = v + 200
-		end
-	})
-
-	VoidSection:Slider({
-		Name = "Void Range",
-		Min = 50,
-		Max = 10000,
-		Default = 5000,
-		Decimals = 1,
-		Flag = "Void_Range",
-		Callback = function(v)
-			voidmeow.void_range = v
-		end
-	})
-
-	VoidSection:Toggle({
-		Name = "Show Indicator",
-		Flag = "Void_ShowIndicator",
-		Default = true,
-		Callback = function(v)
-			voidmeow.show_indicator = v
-		end
-	})
-
-	-- === SPAM SETTINGS ===
 	local SpamSection = RageTab:Section({Name = "Spam Settings"})
-
-	SpamSection:Slider({
-		Name = "Void Time",
-		Min = 0.05,
-		Max = 1,
-		Default = 0.15,
-		Decimals = 0.01,
-		Flag = "Void_VoidTime",
-		Callback = function(v)
-			voidmeow.void_time = v
-		end
-	})
-
-	SpamSection:Slider({
-		Name = "Ground Time",
-		Min = 0.01,
-		Max = 0.5,
-		Default = 0.05,
-		Decimals = 0.01,
-		Flag = "Void_GroundTime",
-		Callback = function(v)
-			voidmeow.normal_time = v
-		end
-	})
+	SpamSection:Slider({Name = "Void Time", Min = 0.05, Max = 1, Default = 0.15, Decimals = 0.01, Flag = "Void_VoidTime", Callback = function(v) voidmeow.void_time = v end})
+	SpamSection:Slider({Name = "Ground Time", Min = 0.01, Max = 0.5, Default = 0.05, Decimals = 0.01, Flag = "Void_GroundTime", Callback = function(v) voidmeow.normal_time = v end})
 else
 	warn("RageTab not found")
 end
-
 
 
 
@@ -6929,9 +6707,7 @@ do
     -- New: Chat Spy
     local ChatSpyEnabled = false
 
-    --------------------------------------------------------------------
-    -- Speed
-    --------------------------------------------------------------------
+
     local function EnableSpeed()
         local Char = LocalPlayer.Character
         if not Char then return end
@@ -6977,9 +6753,7 @@ do
         end
     end
 
-    --------------------------------------------------------------------
-    -- Fly
-    --------------------------------------------------------------------
+
     local function EnableFly()
         local Char = LocalPlayer.Character
         if not Char then return end
@@ -7029,9 +6803,7 @@ do
         if FlyBG and FlyBG.Parent then FlyBG:Destroy(); FlyBG = nil end
     end
 
-    --------------------------------------------------------------------
-    -- Anti-Fling
-    --------------------------------------------------------------------
+
     local function ToggleAntiFling(on)
         if on then
             AntiFlingConnection = RunService.Stepped:Connect(function()
@@ -7055,9 +6827,7 @@ do
         end
     end
 
-    --------------------------------------------------------------------
-    -- Click TP
-    --------------------------------------------------------------------
+
     local function EnableClickTP()
         if ClickTPConnection then ClickTPConnection:Disconnect() end
         ClickTPConnection = UserInputService.InputBegan:Connect(function(input)
@@ -7075,9 +6845,7 @@ do
         if ClickTPConnection then ClickTPConnection:Disconnect(); ClickTPConnection = nil end
     end
 
-    --------------------------------------------------------------------
-    -- Infinite Jump / No Clip / FOV
-    --------------------------------------------------------------------
+
     local function ToggleInfiniteJump(on)
         if on then
             InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
@@ -7122,9 +6890,7 @@ do
         if cam then cam.FieldOfView = v end
     end
 
-    --------------------------------------------------------------------
-    -- NEW: Spinbot
-    --------------------------------------------------------------------
+
     local function ToggleSpinbot(enabled)
         SpinbotEnabled = enabled
         if enabled then
@@ -7148,9 +6914,7 @@ do
         end
     end
 
-    --------------------------------------------------------------------
-    -- NEW: Chat Spy (Legacy + TextChatService)
-    --------------------------------------------------------------------
+
     local function EnableChatSpy()
         ChatSpyEnabled = true
 
@@ -7192,9 +6956,7 @@ do
         ChatSpyEnabled = false
     end
 
-    --------------------------------------------------------------------
-    -- UI
-    --------------------------------------------------------------------
+
     local MovementSection = MiscTab:Section({Name = "Movement", Side = 1})
 
     -- Speed
@@ -7339,9 +7101,6 @@ do
         end
     })
 
-    --------------------------------------------------------------------
-    -- Character Section
-    --------------------------------------------------------------------
     local CharacterSection = MiscTab:Section({Name = "Character", Side = 1})
 
     CharacterSection:Toggle({
@@ -7381,9 +7140,7 @@ do
         end
     end})
 
-    --------------------------------------------------------------------
-    -- Utility Section
-    --------------------------------------------------------------------
+
     local UtilitySection = MiscTab:Section({Name = "Utility", Side = 2})
 
     -- NEW: Chat Spy
@@ -7413,9 +7170,7 @@ do
         end
     })
 
-    --------------------------------------------------------------------
-    -- Game Section
-    --------------------------------------------------------------------
+ 
     local GameSection = MiscTab:Section({Name = "Game", Side = 2})
 
     GameSection:Button({Name = "Rejoin Server", Callback = function()
