@@ -4897,7 +4897,7 @@ local Library do
 end
 --
 local Window = Library:Window({
-    Name = "MEOW.GG - Hood Customs | Ver. 1.0 | Build - Public ",
+    Name = "MEOW.GG - Hood Customs | Ver. 1.1.6 | Build - Public ",
     Size = UDim2.new(0, 350, 0, 350),
     FadeSpeed = 0.25
 })
@@ -4964,6 +4964,7 @@ local RageTab = Window:Page({Name = "Rage", Columns = 2, Subtabs = false})
 
 
 
+
 local voidmeow = {
 	enabled = false,
 	spam_enabled = false,
@@ -4971,6 +4972,7 @@ local voidmeow = {
 	client_root = nil,
 	saved_cframe = nil,
 	current_void_pos = Vector3.new(0, 0, 0),
+	underground_pos = nil, -- Added for static underground position
 	is_in_void = false,
 	timer = 0,
 	void_time = 0.15,
@@ -4983,6 +4985,7 @@ local voidmeow = {
 	void_text_color = Color3.fromRGB(255, 50, 50),
 	spam_text_color = Color3.fromRGB(255, 165, 0),
 	ground_text_color = Color3.fromRGB(50, 255, 150),
+	underground_text_color = Color3.fromRGB(100, 255, 100),
 	selected_mode = "Off"
 }
 
@@ -5016,6 +5019,28 @@ local silentaim = {
 	}
 }
 
+-- Grip Pos Config
+local grip_cfg = {
+	enabled = false,
+	x = 0,
+	y = -7.5,
+	z = 0
+}
+
+-- Hitmarker Config
+local hitmarker_cfg = {
+	enabled = true,
+	mode = "2D", -- "2D", "3D", or "Both"
+	color = Color3.fromRGB(255, 255, 255),
+	size = 12,
+	thickness = 2,
+	duration = 0.3,
+	gap = 4,
+	outline = true,
+	outline_color = Color3.fromRGB(0, 0, 0),
+	outline_thickness = 1
+}
+
 -- Services
 local run_service = game:GetService("RunService")
 local players = game:GetService("Players")
@@ -5031,6 +5056,11 @@ local fov_fill = nil
 local fov_outline = nil
 local tracer_line = nil
 local tracer_outline = nil
+
+-- Hitmarker Storage
+local HitmarkerLines = {}
+local HitmarkerOutlines = {}
+local Active3DHitmarkers = {}
 
 -- Void Drawings
 local voidDrawings = {}
@@ -5181,6 +5211,229 @@ local function createVoidDrawings()
 	voidDrawings.positionDot.ZIndex = 10
 end
 createVoidDrawings()
+
+-- Hitmarker Functions
+local function GetMouseLocation()
+	return uis:GetMouseLocation()
+end
+
+local function Create2DHitmarker()
+	-- Clean up old hitmarkers
+	for _, line in pairs(HitmarkerLines) do 
+		if line then line:Remove() end 
+	end
+	for _, outline in pairs(HitmarkerOutlines) do 
+		if outline then outline:Remove() end 
+	end
+	HitmarkerLines = {}
+	HitmarkerOutlines = {}
+
+	if not hitmarker_cfg.enabled or (hitmarker_cfg.mode ~= "2D" and hitmarker_cfg.mode ~= "Both") then return end
+
+	local center = GetMouseLocation()
+	local size = hitmarker_cfg.size
+	local gap = hitmarker_cfg.gap
+	local thick = hitmarker_cfg.thickness
+	local color = hitmarker_cfg.color
+
+	local directions = {
+		{Vector2.new(-1, -1), Vector2.new(-1, -1)},
+		{Vector2.new(1, -1), Vector2.new(1, -1)},
+		{Vector2.new(-1, 1), Vector2.new(-1, 1)},
+		{Vector2.new(1, 1), Vector2.new(1, 1)}
+	}
+
+	for _, dir in pairs(directions) do
+		-- Outline
+		if hitmarker_cfg.outline then
+			local outline = Drawing.new("Line")
+			outline.Thickness = thick + (hitmarker_cfg.outline_thickness * 2)
+			outline.Color = hitmarker_cfg.outline_color
+			outline.Transparency = 1
+			outline.From = center + dir[1] * gap
+			outline.To = center + dir[2] * (gap + size)
+			outline.Visible = true
+			table.insert(HitmarkerOutlines, outline)
+		end
+
+		-- Main line
+		local line = Drawing.new("Line")
+		line.Thickness = thick
+		line.Color = color
+		line.Transparency = 1
+		line.From = center + dir[1] * gap
+		line.To = center + dir[2] * (gap + size)
+		line.Visible = true
+		table.insert(HitmarkerLines, line)
+	end
+
+	-- Fade out animation
+	task.spawn(function()
+		for t = 1, 0, -0.05 do
+			task.wait()
+			for _, outline in pairs(HitmarkerOutlines) do
+				if outline and outline.Visible then
+					outline.Transparency = t
+				end
+			end
+			for _, line in pairs(HitmarkerLines) do
+				if line and line.Visible then
+					line.Transparency = t
+				end
+			end
+		end
+	end)
+
+	-- Cleanup after duration
+	task.delay(hitmarker_cfg.duration, function()
+		for _, outline in pairs(HitmarkerOutlines) do
+			if outline and outline.Visible then 
+				outline.Visible = false
+				outline:Remove() 
+			end
+		end
+		for _, line in pairs(HitmarkerLines) do
+			if line and line.Visible then 
+				line.Visible = false
+				line:Remove() 
+			end
+		end
+		HitmarkerLines = {}
+		HitmarkerOutlines = {}
+	end)
+end
+
+local function Create3DHitmarker(worldPosition)
+	if not hitmarker_cfg.enabled or (hitmarker_cfg.mode ~= "3D" and hitmarker_cfg.mode ~= "Both") then return end
+	if not worldPosition then return end
+
+	local hitmarkerData = {
+		lines = {},
+		outlines = {},
+		position = worldPosition,
+		createdAt = tick()
+	}
+
+	local size = hitmarker_cfg.size / 10
+	local gap = hitmarker_cfg.gap / 10
+	local thick = hitmarker_cfg.thickness
+	local color = hitmarker_cfg.color
+
+	local directions = {
+		{Vector3.new(-1, -1, 0), Vector3.new(-1, -1, 0)},
+		{Vector3.new(1, -1, 0), Vector3.new(1, -1, 0)},
+		{Vector3.new(-1, 1, 0), Vector3.new(-1, 1, 0)},
+		{Vector3.new(1, 1, 0), Vector3.new(1, 1, 0)}
+	}
+
+	for _, dir in pairs(directions) do
+		-- Outline
+		if hitmarker_cfg.outline then
+			local outline = Drawing.new("Line")
+			outline.Thickness = thick + (hitmarker_cfg.outline_thickness * 2)
+			outline.Color = hitmarker_cfg.outline_color
+			outline.Transparency = 1
+			outline.Visible = true
+			table.insert(hitmarkerData.outlines, {line = outline, dir = dir})
+		end
+
+		-- Main line
+		local line = Drawing.new("Line")
+		line.Thickness = thick
+		line.Color = color
+		line.Transparency = 1
+		line.Visible = true
+		table.insert(hitmarkerData.lines, {line = line, dir = dir})
+	end
+
+	table.insert(Active3DHitmarkers, hitmarkerData)
+
+	-- Fade out animation
+	task.spawn(function()
+		local startTime = tick()
+		local duration = hitmarker_cfg.duration
+		
+		while tick() - startTime < duration do
+			task.wait()
+			local alpha = (tick() - startTime) / duration
+			
+			for _, lineData in pairs(hitmarkerData.outlines) do
+				if lineData.line and lineData.line.Visible then
+					lineData.line.Transparency = alpha
+				end
+			end
+			for _, lineData in pairs(hitmarkerData.lines) do
+				if lineData.line and lineData.line.Visible then
+					lineData.line.Transparency = alpha
+				end
+			end
+		end
+
+		-- Cleanup
+		for _, lineData in pairs(hitmarkerData.outlines) do
+			if lineData.line then
+				lineData.line.Visible = false
+				lineData.line:Remove()
+			end
+		end
+		for _, lineData in pairs(hitmarkerData.lines) do
+			if lineData.line then
+				lineData.line.Visible = false
+				lineData.line:Remove()
+			end
+		end
+
+		-- Remove from active list
+		for i, data in pairs(Active3DHitmarkers) do
+			if data == hitmarkerData then
+				table.remove(Active3DHitmarkers, i)
+				break
+			end
+		end
+	end)
+end
+
+-- Update 3D Hitmarkers Position
+run_service.RenderStepped:Connect(function()
+	for _, hitmarkerData in pairs(Active3DHitmarkers) do
+		local worldPos = hitmarkerData.position
+		local screenPos, onScreen = camera:WorldToViewportPoint(worldPos)
+		
+		if onScreen then
+			local center = Vector2.new(screenPos.X, screenPos.Y)
+			local size = hitmarker_cfg.size
+			local gap = hitmarker_cfg.gap
+
+			for _, lineData in pairs(hitmarkerData.outlines) do
+				if lineData.line and lineData.line.Visible then
+					local dir = lineData.dir[1]
+					local dir2D = Vector2.new(dir.X, dir.Y)
+					lineData.line.From = center + dir2D * gap
+					lineData.line.To = center + dir2D * (gap + size)
+				end
+			end
+			for _, lineData in pairs(hitmarkerData.lines) do
+				if lineData.line and lineData.line.Visible then
+					local dir = lineData.dir[1]
+					local dir2D = Vector2.new(dir.X, dir.Y)
+					lineData.line.From = center + dir2D * gap
+					lineData.line.To = center + dir2D * (gap + size)
+				end
+			end
+		else
+			for _, lineData in pairs(hitmarkerData.outlines) do
+				if lineData.line then
+					lineData.line.Visible = false
+				end
+			end
+			for _, lineData in pairs(hitmarkerData.lines) do
+				if lineData.line then
+					lineData.line.Visible = false
+				end
+			end
+		end
+	end
+end)
 
 -- Silent Aim Functions
 local function createFOVCircle()
@@ -5357,6 +5610,13 @@ local function autoShoot()
 	if not tool then return end
 	pcall(function()
 		tool:Activate()
+		-- Trigger hitmarkers on shot
+		if hitmarker_cfg.mode == "2D" or hitmarker_cfg.mode == "Both" then
+			Create2DHitmarker()
+		end
+		if hitmarker_cfg.mode == "3D" or hitmarker_cfg.mode == "Both" then
+			Create3DHitmarker(target_part.Position)
+		end
 	end)
 	silentaim.last_shot_time = current_time
 end
@@ -5479,20 +5739,48 @@ updateClientRoot()
 local function enable_void_hook()
 	if voidmeow.hook then return end
 	voidmeow.hook = hookmetamethod(game, "__index", function(self, index)
-		if not checkcaller() and (voidmeow.enabled or voidmeow.spam_enabled) and voidmeow.saved_cframe and index == "CFrame" and self == voidmeow.client_root then
+		if not checkcaller() and (voidmeow.enabled or voidmeow.spam_enabled or voidmeow.selected_mode == "Underground") and voidmeow.saved_cframe and index == "CFrame" and self == voidmeow.client_root then
 			return voidmeow.saved_cframe
 		end
 		return voidmeow.hook(self, index)
 	end)
 end
 
+-- FIXED: Static Underground Mode + Random Void
 local function enhancedVoidTeleport()
 	local basePos = voidmeow.client_root.Position
-	local voidPos = Vector3.new(
-		basePos.X + math.random(-voidmeow.void_range, voidmeow.void_range),
-		math.random(voidmeow.void_height_min, voidmeow.void_height_max),
-		basePos.Z + math.random(-voidmeow.void_range, voidmeow.void_range)
-	)
+	local voidPos
+
+	if voidmeow.selected_mode == "Underground" then
+		-- Static underground position - only calculate once
+		if not voidmeow.underground_pos then
+			local groundY = basePos.Y
+			if workspace.Terrain then
+				local region = Region3.new(basePos - Vector3.new(5, 10, 5), basePos + Vector3.new(5, 0, 5))
+				local materials, occupancies = workspace.Terrain:ReadVoxels(region, 4)
+				if #materials > 0 then
+					groundY = basePos.Y - 10 + (occupancies[1][1][1] * 10)
+				end
+			end
+			-- Store the static underground position
+			voidmeow.underground_pos = Vector3.new(
+				basePos.X,
+				groundY - 3, -- Fixed depth underground
+				basePos.Z
+			)
+		end
+		voidPos = voidmeow.underground_pos
+	else
+		-- Reset underground position when switching modes
+		voidmeow.underground_pos = nil
+		-- Random void position for other modes
+		voidPos = Vector3.new(
+			basePos.X + math.random(-voidmeow.void_range, voidmeow.void_range),
+			math.random(voidmeow.void_height_min, voidmeow.void_height_max),
+			basePos.Z + math.random(-voidmeow.void_range, voidmeow.void_range)
+		)
+	end
+
 	local void_cframe = CFrame.new(voidPos)
 	voidmeow.current_void_pos = void_cframe.Position
 	voidmeow.client_root.CFrame = void_cframe
@@ -5507,7 +5795,7 @@ local function setVoidMenuVisible(visible)
 end
 
 local function updateVoidLabel()
-	if voidmeow.enabled then
+	if voidmeow.selected_mode == "Permanent Void" then
 		local pos = voidmeow.current_void_pos
 		voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
 		voidDrawings.modeText.Text = "Permanent Void"
@@ -5518,11 +5806,7 @@ local function updateVoidLabel()
 			local distance = (voidmeow.client_root.Position - pos).Magnitude
 			voidDrawings.distanceText.Text = string.format("%.0f studs", distance)
 		end
-		if voidmeow.show_indicator then
-			setVoidMenuVisible(true)
-			updateVoidMenuPosition()
-		end
-	elseif voidmeow.spam_enabled then
+	elseif voidmeow.selected_mode == "Void Spam" then
 		if voidmeow.is_in_void then
 			local pos = voidmeow.current_void_pos
 			voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
@@ -5536,8 +5820,8 @@ local function updateVoidLabel()
 				local distance = (voidmeow.client_root.Position - pos).Magnitude
 				voidDrawings.distanceText.Text = string.format("%.0f studs", distance)
 			end
-		elseif voidmeow.saved_cframe then
-			local pos = voidmeow.saved_cframe.Position
+		else
+			local pos = voidmeow.saved_cframe and voidmeow.saved_cframe.Position or Vector3.new(0,0,0)
 			voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
 			voidDrawings.modeText.Text = "On Ground"
 			voidDrawings.modeText.Color = voidmeow.ground_text_color
@@ -5547,15 +5831,30 @@ local function updateVoidLabel()
 			voidDrawings.positionGlow.Color = voidmeow.ground_text_color
 			voidDrawings.distanceText.Text = "0 studs"
 		end
-		if voidmeow.show_indicator then
-			setVoidMenuVisible(true)
-			updateVoidMenuPosition()
+	elseif voidmeow.selected_mode == "Underground" then
+		local pos = voidmeow.current_void_pos
+		voidDrawings.positionText.Text = string.format("(%.0f, %.0f, %.0f)", pos.X, pos.Y, pos.Z)
+		voidDrawings.modeText.Text = "Underground"
+		voidDrawings.modeText.Color = voidmeow.underground_text_color
+		voidDrawings.statusDot.Color = voidmeow.underground_text_color
+		voidDrawings.statusDotGlow.Color = voidmeow.underground_text_color
+		voidDrawings.positionDot.Color = voidmeow.underground_text_color
+		voidDrawings.positionGlow.Color = voidmeow.underground_text_color
+		if voidmeow.client_root then
+			local distance = (voidmeow.client_root.Position - pos).Magnitude
+			voidDrawings.distanceText.Text = string.format("%.0f studs", distance)
 		end
 	else
 		setVoidMenuVisible(false)
 		voidDrawings.positionDot.Visible = false
 		voidDrawings.positionDotOutline.Visible = false
 		voidDrawings.positionGlow.Visible = false
+		return
+	end
+
+	if voidmeow.show_indicator then
+		setVoidMenuVisible(true)
+		updateVoidMenuPosition()
 	end
 end
 
@@ -5567,20 +5866,20 @@ local function updateVoidPositionIndicator()
 		return
 	end
 	local targetPosition
-	local character = lp.Character
-	if voidmeow.enabled then
+	if voidmeow.selected_mode == "Permanent Void" or voidmeow.selected_mode == "Underground" or (voidmeow.selected_mode == "Void Spam" and voidmeow.is_in_void) then
 		targetPosition = voidmeow.current_void_pos
-	elseif voidmeow.spam_enabled and voidmeow.is_in_void then
-		targetPosition = voidmeow.current_void_pos
-	elseif voidmeow.spam_enabled and voidmeow.saved_cframe and character then
-		local hrp = character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local rootPos = hrp.Position
-			local cameraDistance = (camera.CFrame.Position - rootPos).Magnitude
-			local heightAdjustment = math.clamp(cameraDistance * 0.15, 2, 8)
-			targetPosition = rootPos + Vector3.new(0, heightAdjustment, 0)
-		else
-			targetPosition = voidmeow.saved_cframe.Position + Vector3.new(0, 3, 0)
+	elseif voidmeow.selected_mode == "Void Spam" and voidmeow.saved_cframe then
+		local character = lp.Character
+		if character then
+			local hrp = character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local rootPos = hrp.Position
+				local cameraDistance = (camera.CFrame.Position - rootPos).Magnitude
+				local heightAdjustment = math.clamp(cameraDistance * 0.15, 2, 8)
+				targetPosition = rootPos + Vector3.new(0, heightAdjustment, 0)
+			else
+				targetPosition = voidmeow.saved_cframe.Position + Vector3.new(0, 3, 0)
+			end
 		end
 	else
 		voidDrawings.positionDot.Visible = false
@@ -5588,6 +5887,7 @@ local function updateVoidPositionIndicator()
 		voidDrawings.positionGlow.Visible = false
 		return
 	end
+
 	local vector, onScreen = camera:WorldToViewportPoint(targetPosition)
 	if onScreen then
 		local screenPos = Vector2.new(vector.X, vector.Y)
@@ -5611,10 +5911,11 @@ end
 -- === MAIN LOOP ===
 run_service.Heartbeat:Connect(function(delta)
 	if not voidmeow.client_root then return end
-	local is_active = voidmeow.enabled or voidmeow.spam_enabled
+	local is_active = voidmeow.selected_mode ~= "Off"
 	voidmeow.enabled = voidmeow.selected_mode == "Permanent Void" and is_active
 	voidmeow.spam_enabled = voidmeow.selected_mode == "Void Spam" and is_active
-	if voidmeow.enabled or voidmeow.spam_enabled then
+
+	if is_active then
 		enable_void_hook()
 		if voidmeow.spam_enabled then
 			voidmeow.timer = voidmeow.timer + delta
@@ -5633,7 +5934,7 @@ run_service.Heartbeat:Connect(function(delta)
 			end
 			run_service.RenderStepped:Wait()
 			voidmeow.client_root.CFrame = voidmeow.saved_cframe
-		elseif voidmeow.enabled then
+		elseif voidmeow.enabled or voidmeow.selected_mode == "Underground" then
 			voidmeow.saved_cframe = voidmeow.client_root.CFrame
 			for i = 1, voidmeow.teleport_speed do
 				enhancedVoidTeleport()
@@ -5647,6 +5948,7 @@ run_service.Heartbeat:Connect(function(delta)
 		voidmeow.saved_cframe = nil
 		voidmeow.is_in_void = false
 		voidmeow.timer = 0
+		voidmeow.underground_pos = nil -- Reset underground position when disabled
 		setVoidMenuVisible(false)
 		voidDrawings.positionDot.Visible = false
 		voidDrawings.positionDotOutline.Visible = false
@@ -5662,7 +5964,44 @@ run_service.RenderStepped:Connect(function()
 	end
 end)
 
+-- === GRIP POS EDITOR ===
+local function applyGripToTool(tool)
+	if not tool:IsA("Tool") then return end
+	if getconnections then
+		for _, conn in ipairs(getconnections(tool:GetPropertyChangedSignal("Grip"))) do
+			if conn.Disable then conn:Disable() end
+		end
+	end
+	tool.Grip = CFrame.new(grip_cfg.x, grip_cfg.y, grip_cfg.z)
+end
 
+local function applyGripToAllTools()
+	if not lp.Character then return end
+	for _, tool in ipairs(lp.Character:GetChildren()) do
+		applyGripToTool(tool)
+	end
+end
+
+lp.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid")
+	char.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") and grip_cfg.enabled then
+			task.wait()
+			applyGripToTool(child)
+		end
+	end)
+end)
+
+if lp.Character then
+	lp.Character.ChildAdded:Connect(function(child)
+		if child:IsA("Tool") and grip_cfg.enabled then
+			task.wait()
+			applyGripToTool(child)
+		end
+	end)
+end
+
+-- === UI ===
 if RageTab then
 	-- Hit-sound table
 	getgenv().hitsounds = {
@@ -5709,7 +6048,6 @@ if RageTab then
 		["One"] = "rbxassetid://7380502345"
 	}
 
-	-- Config
 	local hitsound_cfg = {
 		enabled = true,
 		sound = true,
@@ -5725,20 +6063,16 @@ if RageTab then
 		pending_notif = false
 	}
 
-	-- Get current target
 	local function getTarget()
 		return getClosestPlayerInFOV()
 	end
-
 
 	local function playHitSound()
 		if not hitsound_cfg.sound then return end
 		local now = tick()
 		if now - hitsound_cfg.last_hit_time < 0.15 then return end
-
 		local id = getgenv().hitsounds[hitsound_cfg.selected]
 		if not id then return end
-
 		local s = Instance.new("Sound")
 		s.SoundId = id
 		s.Volume = hitsound_cfg.volume
@@ -5746,166 +6080,105 @@ if RageTab then
 		s.Parent = workspace
 		s:Play()
 		Debris:AddItem(s, 5)
-
 		hitsound_cfg.last_hit_time = now
 	end
-
 
 	local function sendHitNotif(targetName, dmg, toolName, part)
 		if not hitsound_cfg.notif then return end
 		if hitsound_cfg.pending_notif then return end
 		hitsound_cfg.pending_notif = true
-
 		local txt = string.format("MEOW.GG | %s | %d | %s | %s", targetName, dmg, toolName or "Fists", part or "Body")
 		local icon = {"rbxassetid://0", Color3.fromRGB(255, 255, 255)}
-
 		pcall(function()
 			local id = getgenv().hitsounds[hitsound_cfg.selected]:match("%d+")
-			if id then
-				icon = {id, Color3.fromRGB(255, 100, 100)}
-			end
+			if id then icon = {id, Color3.fromRGB(255, 100, 100)} end
 		end)
-
 		pcall(function()
 			Library:Notification(txt, hitsound_cfg.duration, hitsound_cfg.notif_color, icon)
 		end)
-
 		hitsound_cfg.pending_notif = false
 	end
 
-	-- Damage detection
 	local hitConn
 	local function startHitMonitor()
 		if hitConn then hitConn:Disconnect() end
 		if not hitsound_cfg.enabled then return end
-
 		hitConn = run_service.Heartbeat:Connect(function()
 			if not hitsound_cfg.enabled then return end
 			local target = getTarget()
 			if not target or not target.Character then return end
-
 			local hum = target.Character:FindFirstChildOfClass("Humanoid")
 			if not hum then return end
-
 			local cur = hum.Health
 			local prev = hitsound_cfg.last_damage[target] or cur
-
 			if cur < prev and (prev - cur) > 1 then
 				local dmg = math.floor(prev - cur)
 				local now = tick()
-
 				if target ~= hitsound_cfg.last_hit_player or (now - hitsound_cfg.last_hit_time > 0.15) then
 					local tool = lp.Character and lp.Character:FindFirstChildOfClass("Tool")
+					local targetPart = getAimPart(target.Character)
+					
+					-- Play hit sound
 					playHitSound()
-					sendHitNotif(target.Name, dmg, tool and tool.Name, "Body")
+					
+					-- Send notification
+					sendHitNotif(target.Name, dmg, tool and tool.Name, targetPart and targetPart.Name or "Body")
+					
+					-- Trigger hitmarkers
+					if hitmarker_cfg.mode == "2D" or hitmarker_cfg.mode == "Both" then
+						Create2DHitmarker()
+					end
+					if (hitmarker_cfg.mode == "3D" or hitmarker_cfg.mode == "Both") and targetPart then
+						Create3DHitmarker(targetPart.Position)
+					end
+					
 					hitsound_cfg.last_hit_player = target
 					hitsound_cfg.last_hit_time = now
 				end
 			end
-
 			hitsound_cfg.last_damage[target] = cur
 		end)
 	end
 
-	-- UI
+	-- Hitmarker UI Section
+	local HitmarkerSec = RageTab:Section({Name = "Hitmarkers", Side = 2})
+	HitmarkerSec:Toggle({Name = "Enable Hitmarkers", Flag = "Hitmarker_Enabled", Default = true, Callback = function(v) hitmarker_cfg.enabled = v end})
+	HitmarkerSec:Dropdown({Name = "Hitmarker Mode", Flag = "Hitmarker_Mode", Default = "2D", Items = {"2D", "3D", "Both"}, Callback = function(v) hitmarker_cfg.mode = v end})
+	HitmarkerSec:Slider({Name = "Size", Min = 5, Max = 30, Default = 12, Decimals = 1, Flag = "Hitmarker_Size", Callback = function(v) hitmarker_cfg.size = v end})
+	HitmarkerSec:Slider({Name = "Gap", Min = 1, Max = 15, Default = 4, Decimals = 1, Flag = "Hitmarker_Gap", Callback = function(v) hitmarker_cfg.gap = v end})
+	HitmarkerSec:Slider({Name = "Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "Hitmarker_Thickness", Callback = function(v) hitmarker_cfg.thickness = v end})
+	HitmarkerSec:Slider({Name = "Duration", Min = 0.1, Max = 2, Default = 0.3, Decimals = 0.1, Flag = "Hitmarker_Duration", Callback = function(v) hitmarker_cfg.duration = v end})
+	HitmarkerSec:Toggle({Name = "Outline", Flag = "Hitmarker_Outline", Default = true, Callback = function(v) hitmarker_cfg.outline = v end}):Colorpicker({Name = "Outline Color", Flag = "Hitmarker_OutlineColor", Default = Color3.fromRGB(0, 0, 0), Callback = function(c) hitmarker_cfg.outline_color = c end})
+	HitmarkerSec:Slider({Name = "Outline Thickness", Min = 1, Max = 5, Default = 1, Decimals = 1, Flag = "Hitmarker_OutlineThickness", Callback = function(v) hitmarker_cfg.outline_thickness = v end})
+	HitmarkerSec:Label({Name = "Hitmarker Color", Flag = "Hitmarker_Color", Default = Color3.fromRGB(255, 255, 255), Callback = function(c) hitmarker_cfg.color = c end})
+
+	-- Hit Effects UI Section
 	local HitSec = RageTab:Section({Name = "Hit Effects", Side = 2})
-
-	HitSec:Toggle({
-		Name = "Master Enable",
-		Flag = "Hit_Master",
-		Default = true,
-		Callback = function(v)
-			hitsound_cfg.enabled = v
-			if v then startHitMonitor() end
-		end
-	})
-
-	HitSec:Toggle({
-		Name = "Hit Sound",
-		Flag = "Hit_Sound",
-		Default = true,
-		Callback = function(v) hitsound_cfg.sound = v end
-	})
-
-	HitSec:Dropdown({
-		Name = "Sound",
-		Flag = "Hit_SoundChoice",
-		Default = hitsound_cfg.selected,
-		Items = (function()
-			local t = {}
-			for k,_ in pairs(getgenv().hitsounds) do table.insert(t,k) end
-			table.sort(t)
-			return t
-		end)(),
-		Callback = function(v) hitsound_cfg.selected = v end
-	})
-
-	HitSec:Slider({
-		Name = "Volume",
-		Min = 0, Max = 5, Default = hitsound_cfg.volume, Decimals = 0.05,
-		Flag = "Hit_Volume",
-		Callback = function(v) hitsound_cfg.volume = v end
-	})
-
-	HitSec:Slider({
-		Name = "Pitch",
-		Min = 0.5, Max = 2, Default = hitsound_cfg.pitch, Decimals = 0.05,
-		Flag = "Hit_Pitch",
-		Callback = function(v) hitsound_cfg.pitch = v end
-	})
-
-
-	HitSec:Toggle({
-		Name = "Hit Notification",
-		Flag = "Hit_Notif",
-		Default = true,
-		Callback = function(v) hitsound_cfg.notif = v end
-	}):Colorpicker({
-		Name = "Notif Color",
-		Flag = "Hit_Color",
-		Default = hitsound_cfg.notif_color,
-		Callback = function(color)
-			hitsound_cfg.notif_color = color
-		end
-	})
-
-	HitSec:Slider({
-		Name = "Notif Duration",
-		Min = 0.1, Max = 5, Default = hitsound_cfg.duration, Decimals = 0.1,
-		Flag = "Hit_Duration",
-		Callback = function(v) hitsound_cfg.duration = v end
-	})
-
-	-- Start
+	HitSec:Toggle({Name = "Master Enable", Flag = "Hit_Master", Default = true, Callback = function(v) hitsound_cfg.enabled = v if v then startHitMonitor() end end})
+	HitSec:Toggle({Name = "Hit Sound", Flag = "Hit_Sound", Default = true, Callback = function(v) hitsound_cfg.sound = v end})
+	HitSec:Dropdown({Name = "Sound", Flag = "Hit_SoundChoice", Default = hitsound_cfg.selected, Items = (function() local t={} for k,_ in pairs(getgenv().hitsounds) do table.insert(t,k) end table.sort(t) return t end)(), Callback = function(v) hitsound_cfg.selected = v end})
+	HitSec:Slider({Name = "Volume", Min = 0, Max = 5, Default = hitsound_cfg.volume, Decimals = 0.05, Flag = "Hit_Volume", Callback = function(v) hitsound_cfg.volume = v end})
+	HitSec:Slider({Name = "Pitch", Min = 0.5, Max = 2, Default = hitsound_cfg.pitch, Decimals = 0.05, Flag = "Hit_Pitch", Callback = function(v) hitsound_cfg.pitch = v end})
+	HitSec:Toggle({Name = "Hit Notification", Flag = "Hit_Notif", Default = true, Callback = function(v) hitsound_cfg.notif = v end}):Colorpicker({Name = "Notif Color", Flag = "Hit_Color", Default = hitsound_cfg.notif_color, Callback = function(color) hitsound_cfg.notif_color = color end})
+	HitSec:Slider({Name = "Notif Duration", Min = 0.1, Max = 5, Default = hitsound_cfg.duration, Decimals = 0.1, Flag = "Hit_Duration", Callback = function(v) hitsound_cfg.duration = v end})
 	startHitMonitor()
-	print("MEOW.GG: Hit effects loaded – COLORPICKER FIXED!")
-end
 
-
-if RageTab then
 	-- Silent Aim UI
 	local SilentAimSection = RageTab:Section({Name = "Silent Aim", Side = 2})
 	local function setSilentAimActive(active)
 		silentaim.enabled = active
-		if active then
-			createFOVCircle()
-			createTracer()
-		else
-			removeFOVCircle()
-			removeTracer()
-			silentaim.target_player = nil
-		end
+		if active then createFOVCircle() createTracer() else removeFOVCircle() removeTracer() silentaim.target_player = nil end
 	end
 	SilentAimSection:Toggle({Name = "Enabled", Flag = "SilentAim_Enabled", Default = false, Callback = setSilentAimActive})
 	SilentAimSection:Slider({Name = "FOV Size", Min = 50, Max = 1000, Default = 350, Decimals = 1, Flag = "SilentAim_FOV", Callback = function(v) silentaim.fov = v end})
 	SilentAimSection:Dropdown({Name = "Hit Part", Flag = "SilentAim_HitPart", Default = "Head", Items = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}, Callback = function(v) silentaim.hitpart = v end})
 	SilentAimSection:Toggle({Name = "Use Closest Part", Flag = "SilentAim_ClosestPart", Default = false, Callback = function(v) silentaim.use_closest_part = v end})
-	SilentAimSection:Toggle({Name = "Show FOV Circle", Flag = "SilentAim_ShowFOV", Default = true, Callback = function(v) silentaim.show_fov = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_color = c; if fov_circle then fov_circle.Color = c end end})
-	SilentAimSection:Slider({Name = "FOV Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_FOVThickness", Callback = function(v) silentaim.fov_thickness = v; if fov_circle then fov_circle.Thickness = v end; if fov_outline then fov_outline.Thickness = v + 1 end end})
-	SilentAimSection:Toggle({Name = "FOV Fill", Flag = "SilentAim_FOVFill", Default = true, Callback = function(v) silentaim.show_fov_fill = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVFillColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_fill_color = c; if fov_fill then fov_fill.Color = c end end})
-	SilentAimSection:Slider({Name = "Fill Transparency", Min = 0, Max = 1, Default = 0.9, Decimals = 0.01, Flag = "SilentAim_FillTransparency", Callback = function(v) silentaim.fov_fill_transparency = v; if fov_fill then fov_fill.Transparency = v end end})
-	SilentAimSection:Toggle({Name = "Show Tracer", Flag = "SilentAim_ShowTracer", Default = true, Callback = function(v) silentaim.show_tracer = v end}):Colorpicker({Name = "ColorColor", Flag = "SilentAim_TracerColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.tracer_color = c; if tracer_line then tracer_line.Color = c end end})
-	SilentAimSection:Slider({Name = "Tracer Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_TracerThickness", Callback = function(v) silentaim.tracer_thickness = v; if tracer_line then tracer_line.Thickness = v end; if tracer_outline then tracer_outline.Thickness = v + 2 end end})
+	SilentAimSection:Toggle({Name = "Show FOV Circle", Flag = "SilentAim_ShowFOV", Default = true, Callback = function(v) silentaim.show_fov = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_color = c if fov_circle then fov_circle.Color = c end end})
+	SilentAimSection:Slider({Name = "FOV Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_FOVThickness", Callback = function(v) silentaim.fov_thickness = v if fov_circle then fov_circle.Thickness = v end if fov_outline then fov_outline.Thickness = v + 1 end end})
+	SilentAimSection:Toggle({Name = "FOV Fill", Flag = "SilentAim_FOVFill", Default = true, Callback = function(v) silentaim.show_fov_fill = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_FOVFillColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.fov_fill_color = c if fov_fill then fov_fill.Color = c end end})
+	SilentAimSection:Slider({Name = "Fill Transparency", Min = 0, Max = 1, Default = 0.9, Decimals = 0.01, Flag = "SilentAim_FillTransparency", Callback = function(v) silentaim.fov_fill_transparency = v if fov_fill then fov_fill.Transparency = v end end})
+	SilentAimSection:Toggle({Name = "Show Tracer", Flag = "SilentAim_ShowTracer", Default = true, Callback = function(v) silentaim.show_tracer = v end}):Colorpicker({Name = "Color", Flag = "SilentAim_TracerColor", Default = Color3.fromRGB(100,82,88), Callback = function(c) silentaim.tracer_color = c if tracer_line then tracer_line.Color = c end end})
+	SilentAimSection:Slider({Name = "Tracer Thickness", Min = 1, Max = 10, Default = 2, Decimals = 1, Flag = "SilentAim_TracerThickness", Callback = function(v) silentaim.tracer_thickness = v if tracer_line then tracer_line.Thickness = v end if tracer_outline then tracer_outline.Thickness = v + 2 end end})
 	SilentAimSection:Toggle({Name = "Auto Shoot", Flag = "SilentAim_AutoShoot", Default = false, Callback = function(v) silentaim.auto_shoot = v end})
 	SilentAimSection:Slider({Name = "Shoot Delay", Min = 0.01, Max = 1, Default = 0.1, Decimals = 0.01, Flag = "SilentAim_ShootDelay", Callback = function(v) silentaim.auto_shoot_delay = v end})
 
@@ -5917,28 +6190,57 @@ if RageTab then
 	ChecksSection:Toggle({Name = "Dead Check", Flag = "SilentAim_DeadCheck", Default = true, Callback = function(v) silentaim.checks.dead_check = v end})
 	ChecksSection:Toggle({Name = "Team Check", Flag = "SilentAim_TeamCheck", Default = false, Callback = function(v) silentaim.checks.team_check = v end})
 
-	-- Void UI
-	local VoidSection = RageTab:Section({Name = "Anti Aim"})
-	VoidSection:Dropdown({Name = "Void Mode", Flag = "Void_Mode", Default = "Off", Items = {"Off", "Permanent Void", "Void Spam"}, Callback = function(v) voidmeow.selected_mode = v; if v == "Off" then voidmeow.enabled = false; voidmeow.spam_enabled = false end end})
+	-- Anti Aim + Grip Pos + Underground
+	local VoidSection = RageTab:Section({Name = "Anti Aim", Side = 1})
+	local GripSection = RageTab:Section({Name = "Grip Pos Editor", Side = 1})
+
+	VoidSection:Dropdown({
+		Name = "Void Mode",
+		Flag = "Void_Mode",
+		Default = "Off",
+		Items = {"Off", "Permanent Void", "Void Spam", "Underground"},
+		Callback = function(v) voidmeow.selected_mode = v end
+	})
+
 	local function setVoidActive(active)
-		if voidmeow.selected_mode == "Off" then voidmeow.enabled = false; voidmeow.spam_enabled = false
-		else voidmeow.enabled = active and (voidmeow.selected_mode == "Permanent Void"); voidmeow.spam_enabled = active and (voidmeow.selected_mode == "Void Spam") end
+		if voidmeow.selected_mode == "Off" then
+			voidmeow.enabled = false voidmeow.spam_enabled = false
+		else
+			voidmeow.enabled = active and voidmeow.selected_mode == "Permanent Void"
+			voidmeow.spam_enabled = active and voidmeow.selected_mode == "Void Spam"
+		end
 	end
-	VoidSection:Toggle({Name = "Enabled", Flag = "Void_Enabled", Default = false, Callback = setVoidActive}):Keybind({Name = "Hotkey", Flag = "Void_Hotkey", Default = Enum.KeyCode.V, Mode = "Toggle", Callback = setVoidActive})
-	VoidSection:Slider({Name = "TP Speed", Min = 1, Max = 10, Default = 3, Decimals = 1, Flag = "Void_TeleportSpeed", Callback = function(v(v) voidmeow.teleport_speed = math.floor(v) end})
-	VoidSection:Slider({Name = "Void Height", Min = -1000, Max = -100, Default = -400, Decimals = 1, Flag = "Void_Height", Callback = function(v) voidmeow.void_height_min = v; voidmeow.void_height_max = v + 200 end})
+
+	VoidSection:Toggle({Name = "Enabled", Flag = "Void_Enabled", Default = false, Callback = setVoidActive})
+		:Keybind({Name = "Hotkey", Flag = "Void_Hotkey", Default = Enum.KeyCode.V, Mode = "Toggle", Callback = setVoidActive})
+
+	VoidSection:Slider({Name = "TP Speed", Min = 1, Max = 10, Default = 3, Decimals = 1, Flag = "Void_TeleportSpeed", Callback = function(v) voidmeow.teleport_speed = math.floor(v) end})
+	VoidSection:Slider({Name = "Void Height", Min = -1000, Max = -100, Default = -400, Decimals = 1, Flag = "Void_Height", Callback = function(v) voidmeow.void_height_min = v voidmeow.void_height_max = v + 200 end})
 	VoidSection:Slider({Name = "Void Range", Min = 50, Max = 10000, Default = 5000, Decimals = 1, Flag = "Void_Range", Callback = function(v) voidmeow.void_range = v end})
 	VoidSection:Toggle({Name = "Show Indicator", Flag = "Void_ShowIndicator", Default = true, Callback = function(v) voidmeow.show_indicator = v end})
 
-	local SpamSection = RageTab:Section({Name = "Spam Settings"})
+	local SpamSection = RageTab:Section({Name = "Spam Settings", Side = 1})
 	SpamSection:Slider({Name = "Void Time", Min = 0.05, Max = 1, Default = 0.15, Decimals = 0.01, Flag = "Void_VoidTime", Callback = function(v) voidmeow.void_time = v end})
 	SpamSection:Slider({Name = "Ground Time", Min = 0.01, Max = 0.5, Default = 0.05, Decimals = 0.01, Flag = "Void_GroundTime", Callback = function(v) voidmeow.normal_time = v end})
+
+	-- Grip Pos Editor
+	GripSection:Toggle({
+		Name = "Enable Grip Pos",
+		Flag = "Grip_Enabled",
+		Default = false,
+		Callback = function(state)
+			grip_cfg.enabled = state
+			if state then applyGripToAllTools() end
+		end
+	}):Keybind({Name = "Hotkey", Default = Enum.KeyCode.G, Mode = "Toggle"})
+
+
+	GripSection:Slider({Name = "Grip Y", Min = -7.5, Max = 7.5, Default = -7.5, Decimals = 0.1, Flag = "Grip_Y", Callback = function(v) grip_cfg.y = v if grip_cfg.enabled then applyGripToAllTools() end end})
+
+
 else
 	warn("RageTab not found")
 end
-
-
-
 
 
 
