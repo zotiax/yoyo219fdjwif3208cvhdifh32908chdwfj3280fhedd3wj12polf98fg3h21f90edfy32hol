@@ -4897,7 +4897,7 @@ local Library do
 end
 --
 local Window = Library:Window({
-    Name = "MEOW.GG - Hood Customs | Ver. 1.1.6 | Build - Public ",
+    Name = "MEOW.GG - Hood Customs | Ver. 1.0 | Build - Public ",
     Size = UDim2.new(0, 350, 0, 350),
     FadeSpeed = 0.25
 })
